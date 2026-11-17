@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 6 正则化 Regularization</title>
+<script>
+MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+html{scroll-behavior:smooth}
+body{max-width:900px;margin:40px auto;padding:0 20px;font:18px/1.8 -apple-system,"Microsoft YaHei",sans-serif;color:#222;background:#fff}
+h1{font-size:28px;border-bottom:3px solid #2563eb;padding-bottom:12px;margin:56px 0 24px;scroll-margin-top:16px}
+h2{font-size:22px;color:#2563eb;margin:32px 0 16px;padding-left:12px;border-left:4px solid #2563eb;scroll-margin-top:16px}
+h3{font-size:19px;margin:24px 0 12px}
+p{margin:12px 0}
+a{color:#2563eb}
+.block{border-left:4px solid #e5e7eb;padding:16px 20px;margin:16px 0;background:#f9fafb;border-radius:0 8px 8px 0}
+.tip{border-left:4px solid #f59e0b;padding:12px 16px;margin:12px 0;background:#fffbeb;border-radius:0 8px 8px 0}
+.check{border-left:4px solid #8b5cf6;padding:12px 16px;margin:16px 0;background:#f5f3ff;border-radius:0 8px 8px 0}
+.wrong{color:#b91c1c}.right{color:#047857}
+table{border-collapse:collapse;width:100%;margin:16px 0}
+th,td{border:1px solid #d1d5db;padding:10px 14px;text-align:left;vertical-align:top}
+th{background:#f3f4f6}
+pre{background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:8px;overflow-x:auto;font:15px/1.6 Consolas,monospace}
+code{font-family:Consolas,monospace;background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:16px}
+pre code{background:none;padding:0;color:inherit}
+details summary{cursor:pointer;color:#6d28d9;font-weight:bold}
+mjx-container[display="true"]{overflow-x:auto;overflow-y:hidden;max-width:100%}
+#toc{border:1px solid #dbeafe;background:#eff6ff;border-radius:10px;padding:16px 24px;margin:24px 0}
+#toc ol{margin:6px 0;padding-left:22px}
+#toc ol ol{font-size:16px;padding-left:18px}
+#toc li{margin:2px 0}
+</style>
+</head>
+<body>
+
+<h1 style="margin-top:0">AIS5103 · Week 6 · 正则化（Regularization）</h1>
+
+<nav id="toc">
+<strong>📑 目录（点击跳转）</strong>
+<ol>
+<li><a href="#exam">考试定位</a></li>
+<li><a href="#s1">第 1 节　归纳偏置与对称性</a>
+  <ol><li><a href="#s1-1">归纳偏置 / NFL</a></li><li><a href="#s1-2">对称性与群</a></li><li><a href="#s1-3">处理对称性的四种方法</a></li><li><a href="#s1-4">不变性 vs 等变性</a></li></ol></li>
+<li><a href="#s2">第 2 节　正则化 + 偏差-方差权衡</a>
+  <ol><li><a href="#s2-1">什么是正则化</a></li><li><a href="#s2-2">偏差-方差分解</a></li></ol></li>
+<li><a href="#s3">第 3 节　L2 正则 / 权重衰减</a>
+  <ol><li><a href="#s3-1">高斯先验与 MAP</a></li><li><a href="#s3-2">为什么叫"权重衰减"</a></li><li><a href="#s3-3">一维与多维解析解</a></li><li><a href="#s3-4">PyTorch 代码</a></li></ol></li>
+<li><a href="#s4">第 4 节　L1 正则 / LASSO</a>
+  <ol><li><a href="#s4-1">定义、约束形式与几何</a></li><li><a href="#s4-2">一维解析解（软阈值）</a></li><li><a href="#s4-3">L1 vs L2 对比 + 代码</a></li></ol></li>
+<li><a href="#s5">第 5 节　数据增强、早停、Double descent</a>
+  <ol><li><a href="#s5-1">数据增强</a></li><li><a href="#s5-2">早停</a></li><li><a href="#s5-3">早停 ⇔ 权重衰减</a></li><li><a href="#s5-4">Double descent</a></li></ol></li>
+<li><a href="#s6">第 6 节　Bagging、Dropout</a>
+  <ol><li><a href="#s6-1">Bagging 与模型平均</a></li><li><a href="#s6-2">Dropout</a></li></ol></li>
+<li><a href="#s7">全章总结 + 10 道概念题答案模板</a></li>
+<li><a href="#s8">综合练习（计算题）</a></li>
+</ol>
+</nav>
+
+<div class="tip" id="exam">
+<p><strong>🎯 考试定位（11 月 26 日期末，四道大题）</strong></p>
+<table>
+<tr><th>题号</th><th>题型</th><th>本章对应的重点</th></tr>
+<tr><td>第一题</td><td>概念解释</td><td>Slide 20 的 10 个问题：归纳偏置、不变 vs 等变、正则化、偏差-方差、权重衰减、L1 vs L2、double descent、早停、bagging、dropout</td></tr>
+<tr><td>第二题</td><td>代码（Slide 6–10，含 PINN）</td><td>代码里怎么加 L2 / 权重衰减、L1、dropout、早停</td></tr>
+<tr><td>第三、四题</td><td>数学计算（作业难度或略简单）</td><td><strong>L2 / L1 一维极小值推导</strong>（Slide 11–13）、偏差-方差分解（Slide 7）、MAP ⇔ 权重衰减（Slide 8）、bagging 方差 $\frac{1}{M}v+\frac{M-1}{M}c$（Slide 18）、早停 $\lambda\sim\frac{1}{\epsilon\tau}$（Slide 16）</td></tr>
+</table>
+<p>第 1 节（归纳偏置、对称性）主要是<strong>概念题</strong>的考点，能用自己的话讲清楚、举出例子就够了。真正要花力气算的在第 2–4 节和第 6 节。</p>
+</div>
+
+<!-- ====================== 第 1 节 ====================== -->
+<h1 id="s1">第 1 节　归纳偏置与对称性（Inductive bias &amp; Symmetry）</h1>
+
+<h2 id="s1-1">1.1 归纳偏置 Inductive bias</h2>
+
+<h3>① 直观理解</h3>
+<p>想象老师在黑板上画了 3 个点：$(1,1),(2,2),(3,3)$，问你 $x=4$ 时 $y$ 是多少。你脱口而出"4"。可是——穿过这 3 个点的曲线有<strong>无穷多条</strong>，比如 $y=x+(x-1)(x-2)(x-3)$ 也完美穿过它们，却给出 $y(4)=10$。</p>
+<p>你为什么选了"4"？因为你脑子里默认了一个假设：<strong>"规律应该是简单、平滑的"</strong>。这个"在看数据之前就已经带着的偏好/假设"，就是<strong>归纳偏置</strong>。</p>
+<p>没有归纳偏置，有限的数据根本没法唯一决定答案——机器学习就"学"不了任何东西。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>归纳偏置（Inductive bias）</strong>：为了在机器学习中做出好的预测而对数据所作的一组假设，例如数据的<strong>光滑性（smoothness）</strong>、某些<strong>对称性（symmetries）</strong>等。</p>
+<p><strong>逆问题（Inverse problem）</strong>：从数据反推出一个函数或概率分布。机器学习本质就是逆问题——而逆问题通常是"<strong>不适定的（ill-posed）</strong>"：解不唯一或对数据极其敏感。</p>
+<p><strong>没有免费午餐定理（No free lunch theorem）</strong>：如果在<strong>所有可能的问题上均匀平均</strong>，所有学习算法的表现都一样好。</p>
+</div>
+
+<h3>③ 逻辑拆解：这三个概念是怎么串起来的</h3>
+<ol>
+<li><strong>第一</strong>：学习 = 逆问题。给定有限的 $\{x_i,t_i\}$，要找出函数 $f$。</li>
+<li><strong>第二</strong>：逆问题是 ill-posed 的——满足数据的 $f$ 有无穷多个。</li>
+<li><strong>第三</strong>：No free lunch 告诉你：不存在"对所有问题都最好"的算法。某算法在一类问题上更好，必然在另一类问题上更差。</li>
+<li><strong>结论</strong>：要想在<strong>我们真正关心的那类问题</strong>上表现好，就必须<strong>加入符合这类问题的假设</strong>——这就是归纳偏置。正则化（本章主角）就是一种最常见的显式归纳偏置："我们偏好权重小、函数平滑的模型"。</li>
+</ol>
+
+<div class="tip">💡 <strong>一句话记忆</strong>：No free lunch ⇒ 必须有归纳偏置 ⇒ 好的归纳偏置 = 与真实问题匹配的假设。</div>
+
+<h2 id="s1-2">1.2 对称性与群（Symmetry &amp; Group）</h2>
+
+<h3>① 直观理解</h3>
+<p>一张猫的照片，往右平移 10 个像素、或者旋转一点点，它<strong>还是猫</strong>。"对图像做某种变换而答案不变"就是一种对称性。如果我们把这个知识告诉模型，它就不必从数据里辛苦地学"平移后的猫也是猫"——这是非常强大的归纳偏置。</p>
+<p>数学上，用"<strong>群</strong>"来描述一组对称变换。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p>对称性用<strong>群（group）</strong> $G$ 描述。群是一组操作 $A,B,C,\dots$，满足：</p>
+<table>
+<tr><th>公理</th><th>数学表达</th><th>白话</th></tr>
+<tr><td>封闭性 Closure</td><td>若 $A\in G,\ B\in G$，则 $AB\in G$</td><td>两个操作连着做，结果还在这组操作里</td></tr>
+<tr><td>结合律 Associativity</td><td>$(AB)C=A(BC)$</td><td>连做三个，先结合哪两个无所谓</td></tr>
+<tr><td>单位元 Identity</td><td>存在 $I$，$AI=IA=A$</td><td>有一个"什么都不做"的操作</td></tr>
+<tr><td>逆元 Inverse</td><td>对每个 $A$ 存在 $A^{-1}$，$AA^{-1}=A^{-1}A=I$</td><td>每个操作都能被撤销</td></tr>
+</table>
+</div>
+
+<h3>⑤ 例题：验证"平面上转 90° 的倍数"构成群</h3>
+<p><strong>题目</strong>：设 $G=\{R_0,R_{90},R_{180},R_{270}\}$，$R_\theta$ 表示逆时针旋转 $\theta$ 度。证明 $G$ 是群。</p>
+<p><strong>解题思路</strong>：看到"证明是群"，就逐条检查四条公理。</p>
+<ol>
+<li><strong>封闭性</strong>：$R_\alpha R_\beta=R_{(\alpha+\beta)\bmod 360}$。例如 $R_{180}R_{270}=R_{450 \bmod 360}=R_{90}\in G$。任意两个角度之和模 360 仍是 90 的倍数 ✔</li>
+<li><strong>结合律</strong>：旋转的复合就是角度相加，加法满足结合律 ✔</li>
+<li><strong>单位元</strong>：$R_0$（转 0°）✔</li>
+<li><strong>逆元</strong>：$R_{90}^{-1}=R_{270}$，$R_{180}^{-1}=R_{180}$，$R_0^{-1}=R_0$ ✔</li>
+</ol>
+<p><strong>反例</strong>：$\{R_0,R_{90}\}$ 不是群，因为 $R_{90}R_{90}=R_{180}$ 不在该集合中（封闭性失败）。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：最容易漏检的是<strong>封闭性</strong>和<strong>逆元</strong>。"平移 +1 像素"单独一个元素也不是群——它的逆"平移 −1"不在里面。</div>
+
+<h2 id="s1-3">1.3 处理对称性的四种方法（Slide 4）</h2>
+<table>
+<tr><th>方法</th><th>做法</th><th>举例</th></tr>
+<tr><td>1) 预处理 Pre-processing</td><td>先把输入变换到"标准形式"，消掉对称性</td><td>把图像中的物体居中、统一缩放到固定大小</td></tr>
+<tr><td>2) 正则化误差函数 Regularized error function</td><td>在损失里加一项，惩罚模型对变换的输出变化</td><td>$\tilde E=E+\lambda\,\|f(TI)-f(I)\|^2$</td></tr>
+<tr><td>3) 数据增强 Data augmentation</td><td>把变换后的样本也加进训练集</td><td>训练集里加入旋转/平移/翻转后的图像（<a href="#s5-1">第 5 节详讲</a>）</td></tr>
+<tr><td>4) 网络结构 Network architecture</td><td>把对称性"焊死"在结构里</td><td><strong>CNN</strong>：卷积天然对平移等变</td></tr>
+</table>
+<div class="tip">💡 前三种是"让模型<strong>学会</strong>对称性"（近似），第 4 种是"模型<strong>天生就有</strong>对称性"（精确）。</div>
+
+<h2 id="s1-4">1.4 不变性 vs 等变性（Invariance vs Equivariance）— Q&amp;A 第 2 题</h2>
+
+<h3>① 直观理解</h3>
+<ul>
+<li><strong>不变性</strong>：问"这张图里有猫吗？"——图像平移后，答案<strong>完全不变</strong>（还是"有猫"）。</li>
+<li><strong>等变性</strong>：问"猫在图里的哪些像素？"（分割 segmentation）——图像平移后，答案<strong>不是不变</strong>，而是<strong>跟着一起平移</strong>。猫往右走 10 像素，猫的轮廓掩码也往右走 10 像素。</li>
+</ul>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p>设 $I$ 为输入图像，$T$ 为一个变换（如平移 translation），$S$ 为模型/另一个变换（如分割 segmentation）：</p>
+<p><strong>等变性（Equivariance）</strong>：
+$$S(T(I)) = T(S(I))\qquad\text{简写 } STI = TSI$$
+先平移再分割 = 先分割再平移，<strong>顺序可交换</strong>。</p>
+<p><strong>不变性（Invariance）</strong>：
+$$f(T(I)) = f(I)$$
+变换前后输出相同。不变性可以看作等变性的特例——输出空间上的"$T$"是什么都不做的恒等操作。</p>
+</div>
+<p>Slide 5 的图：图像 (a) 先平移得到 (b)，再分割得到 (d)；若反过来先分割 (a) 得到 (c)、再平移 (c)，结果同样是 (d)。这就是等变性。</p>
+
+<h3>⑤ 例题：判断不变 / 等变</h3>
+<p><strong>题目</strong>：设输入是 1D 信号 $I=(0,\ 3,\ 1,\ 0)$，$T$ = 循环右移 1 位。判断下面三个映射对 $T$ 是不变、等变还是都不是：</p>
+<p>(a) $f(I)=\sum_i I_i$　(b) $S(I)=\big(\mathbb 1[I_i>2]\big)_i$（逐元素判断是否大于 2）　(c) $g(I)=I_1$（取第一个元素）</p>
+
+<p><strong>解题思路</strong>：分别算"先变换再映射"和"先映射再变换"，比较。</p>
+<p>先算 $TI=(0,\ 0,\ 3,\ 1)$。</p>
+<p><strong>(a)</strong> $f(TI)=0+0+3+1=4$，$f(I)=0+3+1+0=4$。相等 ⇒ <strong>不变</strong>。（求和不关心元素位置）</p>
+<p><strong>(b)</strong> $S(TI)=(0,0,1,0)$；$S(I)=(0,1,0,0)$，再右移得 $T(S(I))=(0,0,1,0)$。
+$S(TI)=T(S(I))$ ⇒ <strong>等变</strong>。（逐元素操作就像"逐像素分割"，结果跟着位置走）</p>
+<p><strong>(c)</strong> $g(TI)=0$，$g(I)=0$ —— 这一例恰好相等，但换 $I'=(3,0,0,0)$：$g(TI')=g(0,3,0,0)=0\neq g(I')=3$ ⇒ <strong>都不是</strong>。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：判断"不变/等变"必须对<strong>所有</strong>输入成立，一个例子碰巧相等不能下结论；但一个反例就足以否定。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "等变就是输出不变"</span> → <span class="right">✓ 等变是输出<strong>以相同方式</strong>跟着变；输出不变的是"不变性"。</span></li>
+<li><span class="wrong">❌ "CNN 对平移是不变的"</span> → <span class="right">✓ <strong>卷积层</strong>是平移<strong>等变</strong>的；加了全局池化（pooling）后整个分类网络才近似<strong>不变</strong>。</span></li>
+<li><span class="wrong">❌ "No free lunch 说明所有算法一样好，所以选什么都无所谓"</span> → <span class="right">✓ 那是在"所有可能问题上平均"的结论；在<strong>具体的现实问题</strong>上，带有合适归纳偏置的算法明显更好。</span></li>
+</ul>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 做图像分类（判断是不是猫）时，我们希望网络对平移是不变还是等变？做目标检测（输出猫的边框坐标）呢？</p>
+<details><summary>点击查看答案</summary>
+<p>分类：希望<strong>不变</strong>——平移后标签不变。检测：希望<strong>等变</strong>——猫往右移，边框坐标也应该往右移同样的距离。</p>
+</details>
+<p><strong>Q2.</strong> 为什么说"没有免费午餐定理"是归纳偏置存在的理由？用一两句话回答（这正是 Q&amp;A 第 1 题的考法）。</p>
+<details><summary>点击查看答案</summary>
+<p>NFL 说在所有问题上平均，所有算法一样好；因此一个算法要在某类问题上表现好，必须对这类问题做出<strong>假设</strong>（如光滑性、对称性）。这些帮助泛化的假设就是归纳偏置。</p>
+</details>
+<p><strong>Q3.</strong> 集合 $\{\text{恒等},\ \text{水平翻转}\}$ 是不是群？</p>
+<details><summary>点击查看答案</summary>
+<p>是。翻转两次 = 恒等（封闭、且翻转的逆就是它自己），恒等是单位元，复合满足结合律。</p>
+</details>
+</div>
+
+<!-- ====================== 第 2 节 ====================== -->
+<h1 id="s2">第 2 节　正则化 + 偏差-方差权衡（Slide 6–7）</h1>
+
+<h2 id="s2-1">2.1 什么是正则化（Regularization）— Q&amp;A 第 3 题</h2>
+
+<h3>① 直观理解</h3>
+<p>两个学生准备考试。A 同学把练习册上每道题的答案<strong>一字不差背下来</strong>：练习册满分，但考试题稍微一变就不会了。B 同学只抓<strong>核心规律</strong>：练习册上可能错一两道，但新题照样会做。</p>
+<p>A 就是<strong>过拟合（overfitting）</strong>：训练误差极小，泛化很差。B 是<strong>泛化好（generalize well）</strong>。</p>
+<p>正则化就是给模型立的一条规矩：<strong>"不许死记硬背——你越复杂，我扣你越多分"</strong>。于是模型必须在"把训练数据拟合好"和"保持简单"之间找平衡。</p>
+<p>一个经典画面：10 个带噪声的数据点，用 9 次多项式去拟合。它能<strong>完美穿过每一个点</strong>，但曲线在点和点之间疯狂震荡；而且这时多项式系数通常是几千、几万的巨大数值，正负相互抵消。<strong>大权重 ⇔ 剧烈震荡的函数</strong>——这就是为什么"惩罚大权重"能让函数变平滑。</p>
+
+<h3>② 核心定义（Slide 6）</h3>
+<div class="block">
+<p><strong>正则化（Regularization）</strong>：用来<strong>提高泛化能力、减少过拟合</strong>的方法；它能把一个<strong>不适定（ill-posed）</strong>的问题（例如拟合参数比数据还多）变得<strong>良态（well behaved）</strong>。</p>
+<p>最基本的方法——<strong>权重衰减（weight decay）</strong>：
+$$\tilde E(\mathbf w) = E(\mathbf w) + \frac{\lambda}{2}\,\mathbf w^T\mathbf w$$</p>
+</div>
+
+<h3>③ 逻辑拆解：公式里每一项在干什么</h3>
+<table>
+<tr><th>符号</th><th>含义</th><th>作用</th></tr>
+<tr><td>$E(\mathbf w)$</td><td>原始误差，如平方和误差 $\frac12\sum_n(y(x_n,\mathbf w)-t_n)^2$</td><td>把数据拟合好（"考练习册的分"）</td></tr>
+<tr><td>$\mathbf w^T\mathbf w=\sum_j w_j^2$</td><td>权重的平方和（L2 范数的平方）</td><td>衡量模型复杂度（"死记硬背的程度"）</td></tr>
+<tr><td>$\lambda\ge0$</td><td>正则化系数（超参数）</td><td>决定两项谁说了算</td></tr>
+<tr><td>$\frac12$</td><td>纯粹为了求导方便</td><td>$\frac{d}{dw}\frac\lambda2w^2=\lambda w$，没有多余的 2</td></tr>
+</table>
+<p>λ 的三种极端：</p>
+<ol>
+<li><strong>$\lambda=0$</strong>：退化为原问题，可能过拟合；</li>
+<li><strong>$\lambda\to\infty$</strong>：正则项压倒一切，$\mathbf w\to0$，模型几乎什么都不学（欠拟合）；</li>
+<li><strong>λ 适中</strong>：两者平衡——这正是下面"偏差-方差权衡"要回答的问题：λ 怎么选。实际中通常用<strong>验证集</strong>来选 λ。</li>
+</ol>
+
+<h3>④ 推导：为什么正则化能让 ill-posed 变 well-posed</h3>
+<p>以线性回归 $\mathbf y=X\mathbf w$ 为例（$X$ 是 $N\times M$ 的设计矩阵，$N$ 个数据、$M$ 个参数）：</p>
+<ol>
+<li><strong>写出目标</strong>：$\tilde E=\frac12\|X\mathbf w-\mathbf t\|^2+\frac\lambda2\|\mathbf w\|^2$</li>
+<li><strong>求梯度并令其为 0</strong>：$\nabla\tilde E=X^T(X\mathbf w-\mathbf t)+\lambda\mathbf w=0$ → 极小值处梯度为零</li>
+<li><strong>整理</strong>：$(X^TX+\lambda I)\mathbf w=X^T\mathbf t$，所以 $$\mathbf w=(X^TX+\lambda I)^{-1}X^T\mathbf t$$</li>
+<li><strong>为什么一定可逆</strong>：$X^TX$ 是半正定矩阵，特征值 $\ge0$；当 $M>N$（参数多于数据）时一定有特征值为 0 ⇒ 不可逆 ⇒ 解不唯一。加上 $\lambda I$ 后所有特征值都变成 $\ge\lambda>0$ ⇒ <strong>一定可逆，解唯一</strong>。</li>
+</ol>
+
+<h3>⑤ 例题 1：一个数据点、两个参数</h3>
+<p><strong>题目</strong>：线性模型 $y=w_1x_1+w_2x_2$，只有<strong>一个</strong>数据点 $\mathbf x=(1,1)$，$t=2$。(1) 用最小二乘求 $\mathbf w$；(2) 加权重衰减 $\frac\lambda2\|\mathbf w\|^2$ 后再求。</p>
+<p><strong>解题思路</strong>：</p>
+<ol>
+<li>看到"参数（2 个）比数据（1 个）多" ⇒ 应联想到 ill-posed，最小二乘解不唯一；</li>
+<li>加正则后，直接对每个 $w_j$ 求偏导令其为 0。</li>
+</ol>
+<p><strong>详细步骤</strong>：</p>
+<p><strong>(1)</strong> $E=\frac12(w_1+w_2-2)^2$，最小值 0 在直线 $w_1+w_2=2$ 上的<strong>任何点</strong>都能取到：$(1,1)$、$(2,0)$、$(100,-98)$……解有无穷多个。矩阵角度：$X=[1\ \ 1]$，$X^TX=\begin{pmatrix}1&amp;1\\1&amp;1\end{pmatrix}$，行列式 $=0$，不可逆。</p>
+<p><strong>(2)</strong> $\tilde E=\frac12(w_1+w_2-2)^2+\frac\lambda2(w_1^2+w_2^2)$。</p>
+$$\frac{\partial\tilde E}{\partial w_1}=(w_1+w_2-2)+\lambda w_1=0,\qquad \frac{\partial\tilde E}{\partial w_2}=(w_1+w_2-2)+\lambda w_2=0$$
+<p>两式相减：$\lambda(w_1-w_2)=0\Rightarrow w_1=w_2=w$。代入：$(2w-2)+\lambda w=0\Rightarrow w=\dfrac{2}{2+\lambda}$。</p>
+<p><strong>答案</strong>：$\mathbf w=\left(\frac{2}{2+\lambda},\ \frac{2}{2+\lambda}\right)$，<strong>唯一</strong>。$\lambda\to0$ 时趋于 $(1,1)$——恰好是直线 $w_1+w_2=2$ 上<strong>离原点最近（范数最小）</strong>的那个解。</p>
+<div class="tip">💡 这就是 Slide 6 "make an ill-posed problem well behaved" 的具体含义：在无穷多个都能拟合数据的解中，正则项挑出了权重最小的那一个。</div>
+
+<h3>⑤ 例题 2：一维岭回归，看 λ 如何改变解</h3>
+<p><strong>题目</strong>：模型 $y=wx$，数据 $(x,t)=(1,2),\ (2,3)$。目标 $\tilde E=\frac12\sum_n(wx_n-t_n)^2+\frac\lambda2w^2$。求 $\lambda=0$ 和 $\lambda=3$ 时的 $w$。</p>
+<p><strong>解题思路</strong>：一维问题，直接求导令其为 0，得到通式再代数。</p>
+<ol>
+<li>$\dfrac{d\tilde E}{dw}=\sum_nx_n(wx_n-t_n)+\lambda w=0$</li>
+<li>$\Rightarrow w=\dfrac{\sum_n x_nt_n}{\sum_n x_n^2+\lambda}$</li>
+<li>$\sum x_nt_n=1\cdot2+2\cdot3=8$，$\sum x_n^2=1+4=5$</li>
+<li>$\lambda=0$：$w=8/5=1.6$；$\lambda=3$：$w=8/8=1$</li>
+</ol>
+<p><strong>答案</strong>：$w=1.6$（无正则）→ $w=1$（λ=3）。λ 出现在<strong>分母</strong>上，λ 越大 $w$ 越小——这就是"收缩（shrinkage）"。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：求和 $\sum_n$ 只作用在数据项上，λ 项<strong>只加一次</strong>，不要乘以数据个数 $N$。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "正则化就是减少参数个数"</span> → <span class="right">✓ 参数个数不变，而是限制参数的<strong>取值</strong>（大小）。（L1 能让一些参数为 0，算是"间接"减少有效参数。）</span></li>
+<li><span class="wrong">❌ "λ 越大越好，越不会过拟合"</span> → <span class="right">✓ λ 太大会欠拟合，偏差变大。λ 要用验证集调。</span></li>
+<li><span class="wrong">❌ "正则化能降低训练误差"</span> → <span class="right">✓ 正则化通常会让<strong>训练误差升高</strong>，换来<strong>测试误差降低</strong>。</span></li>
+</ul>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 例题 2 中，当 $\lambda\to\infty$ 时 $w$ 趋于多少？这对应偏差大还是方差大？</p>
+<details><summary>点击查看答案</summary><p>$w\to0$，模型永远输出 0，不管数据是什么——方差为 0，但偏差很大（欠拟合）。</p></details>
+<p><strong>Q2.</strong> 为什么"惩罚权重的大小"能让拟合的函数更平滑？</p>
+<details><summary>点击查看答案</summary><p>函数的导数（斜率、弯曲程度）由权重决定；权重大 ⇒ 输出对输入变化敏感 ⇒ 曲线剧烈起伏。限制权重大小 ⇒ 函数变化平缓 ⇒ 更平滑。</p></details>
+</div>
+
+<h2 id="s2-2">2.2 偏差-方差权衡（Bias-Variance trade-off）— Q&amp;A 第 4 题</h2>
+
+<h3>① 直观理解：射箭</h3>
+<p>想象一个奇怪的实验：你能从同一个分布里<strong>反复抽取</strong>不同的训练集 $D_1,D_2,D_3,\dots$，每次都训练出一个新模型。然后让所有模型都对<strong>同一个输入</strong> $x$ 做预测。这些预测就像一把射在靶上的箭，靶心是真实值 $h(x)$：</p>
+<ul>
+<li><strong>偏差（Bias）</strong>：箭的<strong>平均落点</strong>离靶心有多远。模型太简单（如用直线拟合曲线）时，不管换什么数据都偏在同一个方向 ⇒ 偏差大。</li>
+<li><strong>方差（Variance）</strong>：箭<strong>散得有多开</strong>。模型太复杂时，换一个训练集，预测就大变样 ⇒ 方差大。</li>
+</ul>
+<p>λ 调大：箭都挤在一起（方差小），但整体偏离靶心（偏差大）。λ 调小：平均落点对准靶心（偏差小），但箭到处飞（方差大）。<strong>两者不可兼得，要权衡</strong>——这就是 trade-off。</p>
+
+<h3>② 核心定义（Slide 7）</h3>
+<div class="block">
+<p>$D=\{x_i,t_i\}$：数据集；$f(x;D)$：基于有限数据集 $D$ 训练出的预测函数；$h(x)$：真实（精确）的回归函数。</p>
+$$\underbrace{\mathbb E_D\big[(f(x;D)-h(x))^2\big]}_{\text{期望误差}}=\underbrace{\big(\mathbb E_D[f(x;D)]-h(x)\big)^2}_{\text{Bias}^2}+\underbrace{\mathbb E_D\Big[\big(f(x;D)-\mathbb E_D[f(x;D)]\big)^2\Big]}_{\text{Variance}}$$
+<p><strong>Total Error = Bias² + Variance</strong>（expected test MSE）。</p>
+</div>
+
+<h3>③ 逻辑拆解</h3>
+<ol>
+<li><strong>$\mathbb E_D[\cdot]$</strong>：对"所有可能抽到的训练集"求平均。$x$ 是固定的，随机的是 $D$。</li>
+<li><strong>$\mathbb E_D[f(x;D)]$</strong>：所有模型在 $x$ 处预测的平均值——"平均落点"，记为 $\bar f(x)$。</li>
+<li><strong>Bias²</strong>：平均落点与靶心的距离的平方 $(\bar f-h)^2$。</li>
+<li><strong>Variance</strong>：各次预测围绕平均落点的散布 $\mathbb E_D[(f-\bar f)^2]$。</li>
+<li><strong>与 λ 的关系</strong>（Slide 7 图中 "large / small" 指 λ）：</li>
+</ol>
+<table><tr><th></th><th>λ 大</th><th>λ 小</th></tr>
+<tr><td>模型</td><td>简单、平滑</td><td>复杂、灵活</td></tr>
+<tr><td>Bias²</td><td>大</td><td>小</td></tr>
+<tr><td>Variance</td><td>小</td><td>大</td></tr>
+<tr><td>问题</td><td>欠拟合 underfitting</td><td>过拟合 overfitting</td></tr></table>
+<p>总误差关于 λ 通常是 U 形：中间某个 λ 使 Bias² + Variance 最小。</p>
+<div class="tip">💡 如果观测值本身带噪声 $t=h(x)+\varepsilon$（$\mathrm{Var}(\varepsilon)=\sigma^2$），对 $t$ 的期望误差还要再加一个<strong>不可约噪声</strong> $\sigma^2$：$\text{Error}=\text{Bias}^2+\text{Variance}+\sigma^2$。噪声项与模型无关，任何方法都消不掉。</div>
+
+<h3>④ 推导（计算题可能要求写出）</h3>
+<p>记 $\bar f=\mathbb E_D[f(x;D)]$（对 $D$ 而言是常数），简写 $f=f(x;D)$，$h=h(x)$。</p>
+<ol>
+<li><strong>第 1 步：加一项减一项</strong>　$f-h=(f-\bar f)+(\bar f-h)$　→ 为什么：要把"散布"和"系统偏离"拆开。</li>
+<li><strong>第 2 步：平方展开</strong>　$(f-h)^2=(f-\bar f)^2+2(f-\bar f)(\bar f-h)+(\bar f-h)^2$</li>
+<li><strong>第 3 步：对 $D$ 取期望</strong>　交叉项中 $(\bar f-h)$ 与 $D$ 无关，可提到期望外面：
+$$\mathbb E_D\big[2(f-\bar f)(\bar f-h)\big]=2(\bar f-h)\,\mathbb E_D[f-\bar f]=2(\bar f-h)(\bar f-\bar f)=0$$
+→ 为什么为 0：偏离平均值的平均偏离，总是 0。</li>
+<li><strong>第 4 步：得结论</strong>　$\mathbb E_D[(f-h)^2]=\underbrace{(\bar f-h)^2}_{\text{bias}^2}+\underbrace{\mathbb E_D[(f-\bar f)^2]}_{\text{variance}}$　∎</li>
+</ol>
+
+<h3>⑤ 例题 1：数值验证分解</h3>
+<p><strong>题目</strong>：在某点 $x_0$，真实值 $h(x_0)=2.5$。用 3 个不同训练集训练出的模型预测分别为 $1,2,3$。求 bias²、variance，并验证分解公式。</p>
+<p><strong>解题思路</strong>：先求平均预测 $\bar f$，再分别套公式；最后直接算期望误差对比。</p>
+<ol>
+<li>平均预测 $\bar f=(1+2+3)/3=2$</li>
+<li>Bias² $=(\bar f-h)^2=(2-2.5)^2=0.25$</li>
+<li>Variance $=\frac13[(1-2)^2+(2-2)^2+(3-2)^2]=\frac23\approx0.667$</li>
+<li>直接算期望误差：$\frac13[(1-2.5)^2+(2-2.5)^2+(3-2.5)^2]=\frac13(2.25+0.25+0.25)\approx0.917$</li>
+<li>验证：$0.25+0.667=0.917$ ✔</li>
+</ol>
+<div class="tip">⚠ <strong>易错提醒</strong>：(1) 这里的方差是对 $D$ 求期望，除以 $N$（不是样本方差的 $N-1$）；(2) Bias 是<strong>先平均、再减真值、再平方</strong>，不是"每个误差平方后平均"——后者是总误差。</div>
+
+<h3>⑤ 例题 2：为什么"收缩"反而能降低总误差</h3>
+<p><strong>题目</strong>：要估计均值 $\mu=1$，有 $n=4$ 个样本，每个样本方差 $\sigma^2=1$。用"收缩估计" $f=\alpha\bar x$（$\bar x$ 为样本均值，$0\lt\alpha\le1$，α 越小相当于正则越强）。求 bias²、variance 关于 α 的表达式，并求使总误差最小的 α。</p>
+<p><strong>解题思路</strong>：$\bar x$ 的期望是 $\mu$，方差是 $\sigma^2/n$；乘常数 α 后期望乘 α、方差乘 α²。</p>
+<ol>
+<li>$\mathbb E[f]=\alpha\mu$ ⇒ Bias² $=(\alpha\mu-\mu)^2=(\alpha-1)^2\mu^2=(\alpha-1)^2$</li>
+<li>Variance $=\alpha^2\sigma^2/n=\alpha^2/4$</li>
+<li>总误差 $g(\alpha)=(\alpha-1)^2+\alpha^2/4$；$g'(\alpha)=2(\alpha-1)+\alpha/2=0\Rightarrow\alpha=0.8$</li>
+<li>对比：$\alpha=1$（不收缩，无偏）：$0+0.25=0.25$；$\alpha=0.8$：$0.04+0.16=0.20$</li>
+</ol>
+<p><strong>答案</strong>：$\alpha=0.8$ 时总误差 0.20，<strong>比无偏估计的 0.25 还小</strong>。故意引入一点偏差，换来方差的大幅下降——这正是正则化的精髓。</p>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "训练误差越小，模型越好"</span> → <span class="right">✓ 训练误差小可能只是方差大（过拟合）；要看测试/验证误差。</span></li>
+<li><span class="wrong">❌ "方差指数据本身的方差"</span> → <span class="right">✓ 这里的 variance 指<strong>模型预测</strong>随训练集变化而产生的方差。</span></li>
+<li><span class="wrong">❌ "无偏的模型一定最好"</span> → <span class="right">✓ 例题 2 说明：有偏但方差小的估计，总误差可能更小。</span></li>
+</ul>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 一个模型无论用哪个训练集，都预测常数 $f(x)=0$。它的 variance 是多少？bias² 呢？</p>
+<details><summary>点击查看答案</summary><p>Variance $=0$（换训练集预测不变）；bias² $=h(x)^2$，通常很大。这是 λ→∞ 的极端：完全欠拟合。</p></details>
+<p><strong>Q2.</strong> 训练数据量 $N$ 增大时，bias 和 variance 分别会怎样变化？</p>
+<details><summary>点击查看答案</summary><p>Variance 下降（数据越多，换一个训练集模型变化越小）；bias 基本不变（由模型的表达能力决定）。所以数据多时可以用更复杂的模型、更小的 λ。</p></details>
+</div>
+
+<!-- ====================== 第 3 节 ====================== -->
+<h1 id="s3">第 3 节　L2 正则 / 权重衰减（Slide 8–9, 11–12）— Q&amp;A 第 5 题</h1>
+
+<h2 id="s3-1">3.1 权重衰减 = 高斯先验 + 最大后验估计 MAP（Slide 8）</h2>
+
+<h3>① 直观理解</h3>
+<p>你要猜一个新同学的身高。还没见到人之前，你心里已经有个"先入为主"的判断：大概 170 左右，不太可能 2 米 3——这是<strong>先验（prior）</strong>。然后你看到了 TA 的一些照片——这是<strong>数据</strong>，数据告诉你"看起来挺高"——这是<strong>似然（likelihood）</strong>。最后你把两者结合，得出一个最可能的估计——这是<strong>后验（posterior）</strong>。</p>
+<p>放到神经网络里：在看数据之前，我们就"相信"权重应该在 0 附近、不会特别大。把这个信念写成高斯分布，再和数据结合找最可能的权重——结果<strong>恰好就是"误差 + L2 正则"</strong>。所以权重衰减不是凭空拍脑袋，它有概率上的解释。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>先验（prior）</strong>：看到数据之前，假设权重服从高斯分布
+$$p(\mathbf w)\propto\exp\Big(-\frac12\lambda\|\mathbf w\|_2^2\Big)$$
+即均值为 0、方差为 $1/\lambda$ 的高斯（λ 也叫精度 precision）。</p>
+<p><strong>似然（likelihood）</strong>：给定数据 $X$，$L(\mathbf w;X)=p(X\mid\mathbf w)$，表示"在参数 $\mathbf w$ 下，观测到这些数据的可能性"。</p>
+<p><strong>最大后验估计（Maximum a posteriori, MAP）</strong>：
+$$\max_{\mathbf w}\ \log\big[L(\mathbf w;X)\,p(\mathbf w)\big]=\max_{\mathbf w}\Big[-\frac12\lambda\|\mathbf w\|_2^2+\log L(\mathbf w;X)\Big]$$</p>
+<p>对比：<strong>最大似然（MLE）</strong>只最大化 $\log L$，不考虑先验——相当于 $\lambda=0$，没有正则。</p>
+</div>
+
+<h3>③ 逻辑拆解：从贝叶斯公式到正则化</h3>
+<ol>
+<li><strong>贝叶斯公式</strong>：$p(\mathbf w\mid X)=\dfrac{p(X\mid\mathbf w)\,p(\mathbf w)}{p(X)}\propto L(\mathbf w;X)\,p(\mathbf w)$。分母 $p(X)$ 与 $\mathbf w$ 无关，不影响找最大值。</li>
+<li><strong>后验 = 似然 × 先验</strong>：似然代表"数据怎么说"，先验代表"我原本信什么"。</li>
+<li><strong>MAP</strong> = 找让后验最大的 $\mathbf w$。</li>
+</ol>
+
+<h3>④ 推导</h3>
+<ol>
+<li><strong>取对数</strong>：$\log[L\,p]=\log L+\log p$ → 为什么：乘积变加和好处理；log 单调递增，不改变最大值点。</li>
+<li><strong>代入高斯先验</strong>：$\log p(\mathbf w)=-\frac12\lambda\|\mathbf w\|^2+\text{const}$ → 常数不影响优化，扔掉。</li>
+<li><strong>最大化变最小化</strong>：两边乘 −1：$\min_{\mathbf w}\big[-\log L(\mathbf w;X)+\frac\lambda2\|\mathbf w\|^2\big]$</li>
+<li><strong>代入高斯噪声的似然</strong>：若 $t_n=y(x_n,\mathbf w)+\varepsilon_n$，$\varepsilon_n\sim\mathcal N(0,\sigma^2)$ 独立，则
+$$L=\prod_n\frac{1}{\sqrt{2\pi\sigma^2}}\exp\Big(-\frac{(y(x_n,\mathbf w)-t_n)^2}{2\sigma^2}\Big)\ \Rightarrow\ -\log L=\frac{1}{2\sigma^2}\sum_n(y(x_n,\mathbf w)-t_n)^2+\text{const}$$</li>
+<li><strong>结论</strong>：$$\text{MAP}\iff\min_{\mathbf w}\ \frac{1}{2\sigma^2}\sum_n(y(x_n,\mathbf w)-t_n)^2+\frac\lambda2\|\mathbf w\|^2$$ 两边乘 $\sigma^2$，就是"平方和误差 + 系数为 $\lambda\sigma^2$ 的权重衰减"。∎</li>
+</ol>
+<div class="tip">💡 λ 越大 ⇔ 先验方差 $1/\lambda$ 越小 ⇔ 越"坚信"权重接近 0 ⇔ 正则越强。类似地，<strong>L1 正则对应拉普拉斯先验</strong> $p(w)\propto e^{-\lambda|w|}$（见 <a href="#s4-3">4.3</a>）。</div>
+
+<h3>⑤ 例题：MLE vs MAP</h3>
+<p><strong>题目</strong>：模型 $y=wx$，只有一个数据点 $(x,t)=(1,3)$，噪声方差 $\sigma^2=1$，先验 $p(w)\propto\exp(-\frac12\lambda w^2)$，$\lambda=1$。分别求 MLE 和 MAP 估计。</p>
+<p><strong>解题思路</strong>：写出 $-\log$ 后验，求导令其为 0。</p>
+<ol>
+<li>MLE：$\min\frac12(w\cdot1-3)^2\Rightarrow w=3$</li>
+<li>MAP：$\min\frac12(w-3)^2+\frac12w^2$，求导：$(w-3)+w=0\Rightarrow w=1.5$</li>
+<li>一般公式：$w_{MAP}=\dfrac{\sum_nx_nt_n}{\sum_nx_n^2+\lambda\sigma^2}$</li>
+</ol>
+<p><strong>答案</strong>：$w_{MLE}=3$，$w_{MAP}=1.5$。先验把估计往 0 "拉"了一半——数据只有一个点时，先验的话语权很大；数据越多，$\sum x_n^2$ 越大，先验的影响越小。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：先验里的 λ 是<strong>精度</strong>（方差的倒数），不是方差。"先验方差为 4"意味着 $\lambda=1/4$。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "MAP 就是完整的贝叶斯方法"</span> → <span class="right">✓ MAP 只取后验的<strong>最高点</strong>（点估计）；完整贝叶斯要用整个后验分布做预测。</span></li>
+<li><span class="wrong">❌ "先验越强越好"</span> → <span class="right">✓ 先验太强（λ 太大）会压过数据，导致欠拟合。</span></li>
+</ul>
+
+<h2 id="s3-2">3.2 为什么叫"权重衰减"（Slide 9）</h2>
+
+<h3>① 直观理解</h3>
+<p>想象每个权重都放在一个"会漏气的气球"里：每训练一步，气球都会自动漏掉一定<strong>比例</strong>的气（权重按比例变小）；只有当数据的梯度不断"打气"时，重要的权重才能保持住。不重要的权重没人打气，就慢慢瘪下去。</p>
+
+<h3>② 核心定义与推导</h3>
+<div class="block">
+<p>对 $\tilde E=E+\frac\lambda2\|\mathbf w\|^2$ 做梯度下降（学习率 $\eta$）：</p>
+$$\mathbf w\leftarrow\mathbf w-\eta\big(\nabla E+\lambda\mathbf w\big)=\underbrace{(1-\eta\lambda)\,\mathbf w}_{\text{先按比例衰减}}-\underbrace{\eta\nabla E}_{\text{再按原梯度更新}}$$
+<p>每一步，权重都先被乘以一个略小于 1 的数 $(1-\eta\lambda)$——这就是"<strong>衰减</strong>"名字的来源。</p>
+</div>
+
+<h3>③ 逻辑拆解：Slide 9 "Larger weight is pushed to smaller value"</h3>
+<ol>
+<li>正则项 $\frac\lambda2w^2$ 的梯度是 $\lambda w$，<strong>与 $w$ 成正比</strong>。</li>
+<li>$w$ 越大 → 往回拉的力越大；$w$ 越接近 0 → 拉力越小。</li>
+<li>所以 L2 对大权重惩罚最狠，而对已经很小的权重几乎不管——<strong>它不会把权重压到恰好 0</strong>（对比 L1，<a href="#s4">第 4 节</a>）。</li>
+</ol>
+
+<h3>⑤ 例题</h3>
+<p><strong>题目</strong>：$w=5$，$\eta=0.1$，$\lambda=0.5$，假设数据梯度 $\nabla E=0$（只看正则的作用）。求 1 步、10 步后的 $w$，并说明会不会变成 0。</p>
+<ol>
+<li>衰减因子 $1-\eta\lambda=1-0.05=0.95$</li>
+<li>1 步：$w=0.95\times5=4.75$</li>
+<li>10 步：$w=5\times0.95^{10}\approx5\times0.599=2.99$</li>
+<li>$t$ 步：$w=5\times0.95^t$，指数衰减，<strong>永远不会恰好为 0</strong></li>
+</ol>
+<div class="tip">⚠ <strong>易错提醒</strong>：要求 $\eta\lambda\lt1$，否则 $(1-\eta\lambda)$ 为负，权重会来回变号甚至发散。</div>
+
+<h2 id="s3-3">3.3 一维与多维解析解（Slide 11–12，计算题重点）</h2>
+
+<h3>① 直观理解</h3>
+<p>原始损失像一个碗，碗底在 $w^*$。正则项像另一个碗，碗底在 0。把两个碗"叠加"，新碗的碗底一定落在 0 和 $w^*$ <strong>之间</strong>——具体靠近谁，取决于哪个碗更"陡"：原损失越陡（曲率 $H$ 大），越靠近 $w^*$；正则越强（λ 大），越靠近 0。</p>
+
+<h3>② 设定（Slide 11–12）</h3>
+<div class="block">
+<p>把原始损失在其最小值点 $w^*$ 附近做二次近似：</p>
+$$E(w)\approx\frac12H(w-w^*)^2$$
+<p>加 L2 正则后：$$E=\frac12\lambda w^2+\frac12H(w-w^*)^2$$
+其中 $\frac12H(w-w^*)^2$ 是 original loss，$\frac12\lambda w^2$ 是 regularization term。</p>
+</div>
+
+<h3>③ 逻辑拆解：为什么可以用二次近似</h3>
+<ol>
+<li>在 $w^*$ 处做泰勒展开：$E(w)=E(w^*)+E'(w^*)(w-w^*)+\frac12E''(w^*)(w-w^*)^2+\dots$</li>
+<li>$w^*$ 是极小值点 ⇒ $E'(w^*)=0$，一次项消失。</li>
+<li>记 $H=E''(w^*)>0$（曲率），常数 $E(w^*)$ 不影响最优点 ⇒ 剩下 $\frac12H(w-w^*)^2$。</li>
+</ol>
+
+<h3>④ 推导</h3>
+<ol>
+<li><strong>求导</strong>：$\dfrac{dE}{dw}=\lambda w+H(w-w^*)=0$</li>
+<li><strong>整理</strong>：$(H+\lambda)\,w=Hw^*$</li>
+<li><strong>结果</strong>：$$\boxed{w=\frac{H}{H+\lambda}\,w^*}$$</li>
+</ol>
+<p><strong>解读</strong>：新最小值 = 原最小值 × 一个 $(0,1)$ 之间的缩放因子 $\frac{H}{H+\lambda}$。</p>
+<ul>
+<li>$\lambda\ll H$：因子 ≈ 1，几乎不变；</li>
+<li>$\lambda\gg H$：因子 ≈ $H/\lambda$ → 0，被压得很小；</li>
+<li>只要 $w^*\ne0$，结果<strong>永远不为 0</strong>——只收缩，不归零。</li>
+</ul>
+
+<h3>④ 多维推广（理解即可，早停推导会用到）</h3>
+<p>若 $E=\frac12(\mathbf w-\mathbf w^*)^TH(\mathbf w-\mathbf w^*)$，$H$ 为 Hessian 矩阵：</p>
+<ol>
+<li>求梯度：$\lambda\mathbf w+H(\mathbf w-\mathbf w^*)=0\Rightarrow\mathbf w=(H+\lambda I)^{-1}H\mathbf w^*$</li>
+<li>把 $H$ 特征分解 $H=Q\Lambda Q^T$（$Q$ 正交，$\Lambda=\mathrm{diag}(h_1,h_2,\dots)$）</li>
+<li>在特征向量方向上，每个分量独立地缩放：$$w_i=\frac{h_i}{h_i+\lambda}\,w_i^*$$</li>
+<li><strong>含义</strong>：曲率大（$h_i\gg\lambda$）的方向——数据对它"很敏感"——几乎不变；曲率小（$h_i\ll\lambda$）的方向——数据对它"不在乎"——被大幅压缩。</li>
+</ol>
+
+<h3>⑤ 例题 1（一维）</h3>
+<p><strong>题目</strong>：$E(w)=\frac12\cdot4\,(w-3)^2$，加正则 $\frac12\cdot2\,w^2$。求新最小值点及该点的总损失。</p>
+<p><strong>解题思路</strong>：对照标准形式 $\frac12\lambda w^2+\frac12H(w-w^*)^2$ 读出参数，套公式。</p>
+<ol>
+<li>识别：$H=4$，$w^*=3$，$\lambda=2$</li>
+<li>$w=\frac{4}{4+2}\times3=2$</li>
+<li>总损失：$E=\frac12\cdot2\cdot2^2+\frac12\cdot4\cdot(2-3)^2=4+2=6$</li>
+</ol>
+<p><strong>答案</strong>：$w=2$，$E=6$。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：先确认题目是 $\frac\lambda2w^2$ 还是 $\lambda w^2$！若为 $\lambda w^2$，导数为 $2\lambda w$，结果变成 $\frac{H}{H+2\lambda}w^*$。</div>
+
+<h3>⑤ 例题 2（二维，体会"按方向收缩"）</h3>
+<p><strong>题目</strong>：$H=\begin{pmatrix}10&amp;0\\0&amp;0.1\end{pmatrix}$，$\mathbf w^*=(1,1)$，$\lambda=1$（$\frac\lambda2\|\mathbf w\|^2$ 形式）。求正则后的 $\mathbf w$。</p>
+<p><strong>解题思路</strong>：$H$ 已经是对角阵，特征方向就是坐标轴，每个分量单独套一维公式。</p>
+<ol>
+<li>$w_1=\frac{10}{10+1}\times1\approx0.909$</li>
+<li>$w_2=\frac{0.1}{0.1+1}\times1\approx0.091$</li>
+</ol>
+<p><strong>答案</strong>：$\mathbf w\approx(0.909,\ 0.091)$。同样的 λ，曲率大的方向几乎没动，曲率小的方向被压到原来的 1/11。</p>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "L2 正则会让某些权重变成 0"</span> → <span class="right">✓ L2 只按比例缩小，$\frac{H}{H+\lambda}w^*\ne0$。让权重为 0 的是 L1。</span></li>
+<li><span class="wrong">❌ "所有权重被压缩的比例一样"</span> → <span class="right">✓ 比例 $\frac{h_i}{h_i+\lambda}$ 依赖于每个方向的曲率。</span></li>
+<li><span class="wrong">❌ 求导时把 $\frac12\lambda w^2$ 的导数写成 $2\lambda w$ 或 $\frac12\lambda w$</span> → <span class="right">✓ 导数是 $\lambda w$。</span></li>
+</ul>
+
+<h2 id="s3-4">3.4 PyTorch 代码（代码题）</h2>
+<pre><code># 方法 1：优化器自带 weight_decay
+# 梯度里加 wd * w，等价于损失里加 (wd/2) * ||w||^2
+optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, weight_decay=1e-4)
+
+# 方法 2：手动在 loss 里加 L2 项（更透明，PINN 里也常这样写）
+lam = 1e-4
+for x, y in loader:
+    pred = model(x)
+    mse = torch.nn.functional.mse_loss(pred, y)
+    l2 = sum((p ** 2).sum() for p in model.parameters())   # ||w||^2
+    loss = mse + lam * l2
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</code></pre>
+<p><strong>逐行解释</strong>：</p>
+<ul>
+<li><code>model.parameters()</code>：遍历网络所有可训练参数（权重和偏置）；</li>
+<li><code>(p ** 2).sum()</code>：一个参数张量所有元素的平方和；外层 <code>sum(...)</code> 把所有层加起来，得到 $\|\mathbf w\|^2$；</li>
+<li><code>lam * l2</code> 加进 loss 后，<code>backward()</code> 会自动算出 $2\lambda\mathbf w$ 这一项梯度（注意这里没有 $\frac12$）。</li>
+</ul>
+<div class="tip">💡 (1) 方法 1 和方法 2 <strong>不要同时用</strong>，否则正则加了两遍。(2) Adam 的 <code>weight_decay</code> 是把 $\lambda w$ 加进梯度再做自适应缩放；<code>AdamW</code> 是"解耦"的权重衰减（直接 $w\leftarrow w-\eta\lambda w$）。对 SGD 两者等价，对 Adam 不等价。</div>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> $H=1,\ w^*=10$，要让正则后的最小值变为 $w=2$，λ 应取多少？</p>
+<details><summary>点击查看答案</summary><p>$\frac{1}{1+\lambda}\cdot10=2\Rightarrow\lambda=4$。</p></details>
+<p><strong>Q2.</strong> 先验 $p(\mathbf w)$ 是方差为 0.01 的零均值高斯，对应的 λ 是多少？这算强正则还是弱正则？</p>
+<details><summary>点击查看答案</summary><p>$\lambda=1/0.01=100$，强正则——非常坚信权重接近 0。</p></details>
+<p><strong>Q3.</strong> 用 <code>SGD(lr=0.1, weight_decay=0.01)</code> 训练，若某步数据梯度恰为 0，权重每步乘以多少？</p>
+<details><summary>点击查看答案</summary><p>$1-\eta\lambda=1-0.1\times0.01=0.999$。</p></details>
+</div>
+
+<!-- ====================== 第 4 节 ====================== -->
+<h1 id="s4">第 4 节　L1 正则 / LASSO（Slide 10–13）— Q&amp;A 第 6 题</h1>
+
+<h2 id="s4-1">4.1 定义、约束形式与几何（Slide 10）</h2>
+
+<h3>① 直观理解</h3>
+<p>两种"减肥"方案：</p>
+<ul>
+<li><strong>L2 像"全场打八折"</strong>：每个权重都按比例缩小。100 变 80，1 变 0.8——小的也还在。</li>
+<li><strong>L1 像"每件商品都减 2 块钱"</strong>：每个权重都减去一个固定量。100 变 98，但 1.5 块的东西直接<strong>变成 0（白送/下架）</strong>。</li>
+</ul>
+<p>所以 L1 会把一批不重要的小权重直接清零，模型只剩下少数重要的权重——这叫<strong>稀疏（sparse）</strong>，相当于自动做了<strong>特征选择</strong>。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>$L_1$ 范数正则 / LASSO</strong>（Least Absolute Shrinkage and Selection Operator）：</p>
+$$\min_{\mathbf w}\ E(\mathbf w)+\lambda\sum_{j=1}^M|w_j|$$
+<p>由<strong>拉格朗日乘子法（Lagrange multiplier）</strong>，等价于约束优化问题：</p>
+$$\min_{\mathbf w}\ E(\mathbf w)\quad\text{subject to}\quad\sum_{j=1}^M|w_j|\le\eta$$
+<p><strong>效果：一部分权重被恰好设为 0。</strong></p>
+</div>
+
+<h3>③ 逻辑拆解：为什么"加惩罚"和"加约束"等价</h3>
+<ol>
+<li>约束问题"在 $\sum|w_j|\le\eta$ 的预算内，让 $E$ 最小"。</li>
+<li>用拉格朗日乘子把约束搬进目标：$E(\mathbf w)+\lambda\big(\sum|w_j|-\eta\big)$，其中 $-\lambda\eta$ 是常数，不影响最优点。</li>
+<li>所以两者的解相同；<strong>每个预算 η 对应某个 λ</strong>：预算 η 越小 ⇔ λ 越大 ⇔ 正则越强。</li>
+<li>同理，L2 正则等价于约束 $\sum w_j^2\le\eta$。</li>
+</ol>
+
+<h3>③ 几何解释（Slide 10 的图，概念题常考）</h3>
+<p>在二维 $(w_1,w_2)$ 平面上画图：</p>
+<ul>
+<li><strong>L1 约束区域</strong> $|w_1|+|w_2|\le\eta$ 是一个<strong>菱形</strong>，四个<strong>尖角落在坐标轴上</strong>。</li>
+<li><strong>L2 约束区域</strong> $w_1^2+w_2^2\le\eta$ 是一个<strong>圆</strong>，边界处处光滑。</li>
+<li>原始损失 $E$ 的等高线是以 $\mathbf w^*$ 为中心的一圈圈椭圆。想象椭圆从 $\mathbf w^*$ 开始<strong>慢慢变大</strong>，<strong>第一次碰到约束区域</strong>的那个点，就是约束问题的解。</li>
+<li>椭圆去碰菱形：最容易先碰到"<strong>尖角</strong>"（尖角往外突出）。尖角在坐标轴上 ⇒ 某个坐标为 0 ⇒ <strong>稀疏</strong>。</li>
+<li>椭圆去碰圆：圆没有尖角，切点一般落在普通位置 ⇒ 两个坐标都不为 0。</li>
+</ul>
+<div class="tip">💡 维度越高，菱形（高维叫"交叉多面体"）的尖角和棱越多，解落在"某些坐标为 0"的位置的概率就越大——高维下 L1 的稀疏效果更明显。</div>
+
+<h2 id="s4-2">4.2 一维解析解：软阈值（Slide 11, 13，计算题重点）</h2>
+
+<h3>② 设定</h3>
+<div class="block">
+<p>同样把原始损失做二次近似，加 L1 正则：</p>
+$$E=\lambda|w|+\frac12H(w-w^*)^2$$
+<p>Slide 11 把两个一维问题放在一起比较：
+$$\text{L2: }\min_w\ \frac12\lambda w^2+\frac12H(w-w^*)^2\qquad\text{vs}\qquad\text{L1: }\min_w\ \lambda|w|+\frac12H(w-w^*)^2$$</p>
+</div>
+
+<h3>③ 逻辑拆解：难点在哪</h3>
+<p>$|w|$ 在 $w=0$ 处有一个"尖"，<strong>不可导</strong>。所以不能像 L2 那样一步"求导令其为 0"，而要<strong>分情况讨论</strong>：$w>0$、$w\lt0$、$w=0$。</p>
+
+<h3>④ 推导（以 $w^*>0$ 为例，Slide 13）</h3>
+<ol>
+<li><strong>情形 1：假设解在 $w>0$</strong>。此时 $|w|=w$：
+$$E=\lambda w+\frac12H(w-w^*)^2,\qquad\frac{dE}{dw}=\lambda+H(w-w^*)=0\ \Rightarrow\ w=w^*-\frac{\lambda}{H}$$
+但这个解必须满足假设 $w>0$，即 $w^*>\dfrac\lambda H$。</li>
+<li><strong>情形 2：$0\lt w^*\le\dfrac\lambda H$</strong>。
+<ul>
+<li>在 $w>0$ 一侧：导数 $\lambda+H(w-w^*)\ge\lambda-Hw^*+Hw>0$（因为 $Hw^*\le\lambda$），函数<strong>递增</strong>；</li>
+<li>在 $w\lt0$ 一侧：$|w|=-w$，导数 $-\lambda+H(w-w^*)\lt0$，函数<strong>递减</strong>；</li>
+<li>左边下降、右边上升 ⇒ 最低点在拐角 $w=0$。</li>
+</ul></li>
+<li><strong>汇总</strong>（Slide 13）：
+$$w=\begin{cases}w^*-\dfrac{\lambda}{H}, &amp; \text{if } w^*>\dfrac\lambda H\\[2mm] 0, &amp; \text{otherwise}\end{cases}$$</li>
+<li><strong>推广到任意符号的 $w^*$</strong>（$w^*\lt0$ 时对称），统一写成<strong>软阈值（soft thresholding）</strong>：
+$$\boxed{w=\operatorname{sign}(w^*)\,\max\!\Big(|w^*|-\frac{\lambda}{H},\ 0\Big)}$$</li>
+</ol>
+<p><strong>与 L2 对比</strong>：L2 是<strong>乘法缩放</strong> $\frac{H}{H+\lambda}w^*$；L1 是<strong>减法平移</strong> $w^*-\frac\lambda H$，一旦 $|w^*|$ 小于阈值 $\frac\lambda H$ 就<strong>直接截断为 0</strong>。</p>
+<div class="tip">💡 次梯度视角（理解即可）：$|w|$ 在 0 处的"导数"可以是 $[-1,1]$ 中任何值。$w=0$ 是最优 ⇔ $0\in\lambda[-1,1]-Hw^*$ ⇔ $|Hw^*|\le\lambda$ ⇔ $|w^*|\le\lambda/H$。和上面的结论一致。</div>
+
+<h3>⑤ 例题 1：同一组参数下 L1 vs L2</h3>
+<p><strong>题目</strong>：$H=2,\ \lambda=4$。分别对 $w^*=3,\ 1.5,\ -5$ 求 L1 正则（$\lambda|w|$）和 L2 正则（$\frac\lambda2w^2$）后的最优 $w$。</p>
+<p><strong>解题思路</strong>：L1 先算阈值 $\lambda/H=2$，判断 $|w^*|$ 是否超过阈值；L2 直接算缩放因子 $\frac{H}{H+\lambda}=\frac26=\frac13$。</p>
+<table>
+<tr><th>$w^*$</th><th>L1：$\operatorname{sign}(w^*)\max(|w^*|-2,0)$</th><th>L2：$\frac13w^*$</th></tr>
+<tr><td>3</td><td>$3>2$ ⇒ $3-2=1$</td><td>$1$</td></tr>
+<tr><td>1.5</td><td>$1.5\le2$ ⇒ $0$</td><td>$0.5$</td></tr>
+<tr><td>−5</td><td>$-(5-2)=-3$</td><td>$-1.667$</td></tr>
+</table>
+<p><strong>观察</strong>：L1 把小权重 1.5 直接<strong>归零</strong>，但对大权重 −5 只扣固定的 2；L2 对所有权重同比例缩小，<strong>从不归零</strong>，但对大权重压得更狠（−5 → −1.667）。</p>
+
+<h3>⑤ 例题 2：二维 L1（体会稀疏）</h3>
+<p><strong>题目</strong>：$E(\mathbf w)=\frac12\big[(w_1-2)^2+(w_2-0.5)^2\big]$（即 $H=I$，$\mathbf w^*=(2,0.5)$）。(a) 加 L1 正则 $1\cdot(|w_1|+|w_2|)$；(b) 加 L2 正则 $\frac12\cdot1\cdot(w_1^2+w_2^2)$。分别求最优 $\mathbf w$。</p>
+<p><strong>解题思路</strong>：$H$ 是单位阵，两个分量互不影响，各自套一维公式。</p>
+<ol>
+<li>(a) 阈值 $\lambda/H=1$：$w_1=2-1=1$；$w_2$：$0.5\le1$ ⇒ $0$。$\mathbf w=(1,0)$ —— <strong>稀疏</strong>。</li>
+<li>(b) 因子 $\frac{1}{1+1}=\frac12$：$\mathbf w=(1,0.25)$ —— 都不为 0。</li>
+</ol>
+<div class="tip">⚠ <strong>易错提醒</strong>：(1) 不要对 $|w|$ 直接"求导令 0"了事，一定分区间讨论，并<strong>检查解是否落在假设的区间里</strong>；(2) 阈值是 $\lambda/H$，不是 λ——曲率 $H$ 不为 1 时容易忘除。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "L1 把所有权重都变成 0"</span> → <span class="right">✓ 只有 $|w^*|\le\lambda/H$ 的那些才变 0，大权重只是减去 $\lambda/H$。</span></li>
+<li><span class="wrong">❌ "L1 对大权重惩罚得比 L2 更狠"</span> → <span class="right">✓ 恰恰相反：L1 对所有权重扣同样多；L2 的拉力与 $w$ 成正比，大权重被压得更狠。</span></li>
+<li><span class="wrong">❌ "L1 在 0 处不可导，所以不能用梯度下降训练"</span> → <span class="right">✓ 实际中用次梯度（PyTorch 中 <code>abs</code> 在 0 处梯度取 0）或近端方法，照样能训练。</span></li>
+</ul>
+
+<h2 id="s4-3">4.3 L1 vs L2 对比（Q&amp;A 第 6 题，必背）+ 代码</h2>
+<table>
+<tr><th></th><th>L2（Ridge / weight decay）</th><th>L1（LASSO）</th></tr>
+<tr><td>正则项</td><td>$\frac\lambda2\sum w_j^2$</td><td>$\lambda\sum|w_j|$</td></tr>
+<tr><td>一维解</td><td>$\frac{H}{H+\lambda}w^*$（按比例缩小）</td><td>$\operatorname{sign}(w^*)\max(|w^*|-\frac\lambda H,0)$（软阈值）</td></tr>
+<tr><td>效果</td><td><strong>收缩</strong>权重，不归零</td><td><strong>稀疏</strong>：部分权重恰好为 0（特征选择）</td></tr>
+<tr><td>约束区域形状</td><td>圆 / 球（光滑）</td><td>菱形 / 多面体（有尖角）</td></tr>
+<tr><td>正则项梯度</td><td>$\lambda w$，正比于 $w$</td><td>$\lambda\,\operatorname{sign}(w)$，大小恒定</td></tr>
+<tr><td>对应先验</td><td>高斯 Gaussian</td><td>拉普拉斯 Laplace</td></tr>
+<tr><td>可导性</td><td>处处可导，有闭式解</td><td>0 点不可导，一般无闭式解（一维除外）</td></tr>
+</table>
+<p><strong>相同点</strong>：都惩罚模型复杂度、减少过拟合；都是凸函数；都可写成"误差 + 范数约束"的拉格朗日形式；λ 越大正则越强；都对应某种先验下的 MAP。</p>
+
+<pre><code># L1 正则：PyTorch 优化器没有内置 L1，需要手动加在 loss 里
+lam1 = 1e-4
+pred = model(x)
+l1 = sum(p.abs().sum() for p in model.parameters())   # sum |w|
+loss = criterion(pred, y) + lam1 * l1
+optimizer.zero_grad()
+loss.backward()
+optimizer.step()
+
+# 检查稀疏程度：有多少权重接近 0
+w = torch.cat([p.detach().flatten() for p in model.parameters()])
+print('sparsity:', (w.abs() &lt; 1e-3).float().mean().item())</code></pre>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 有 1000 个特征，但你怀疑只有 10 个真正有用，选 L1 还是 L2？为什么？</p>
+<details><summary>点击查看答案</summary><p>L1。它会把无用特征的权重压到恰好 0，自动完成特征选择；L2 只会把它们变小，仍保留在模型里。</p></details>
+<p><strong>Q2.</strong> $H=5,\ \lambda=10$，L1 正则下，$w^*$ 在什么范围内结果会是 0？</p>
+<details><summary>点击查看答案</summary><p>阈值 $\lambda/H=2$，$|w^*|\le2$ 即 $-2\le w^*\le2$ 时 $w=0$。</p></details>
+<p><strong>Q3.</strong> 用几何图解释为什么 L1 产生稀疏解（一两句话，概念题考法）。</p>
+<details><summary>点击查看答案</summary><p>L1 约束区域是菱形，尖角在坐标轴上；损失等高线向外扩张时最先碰到尖角，尖角处某些坐标为 0，所以解是稀疏的。L2 的圆没有尖角，切点一般不在坐标轴上。</p></details>
+</div>
+
+<!-- ====================== 第 5 节 ====================== -->
+<h1 id="s5">第 5 节　数据增强、早停、Double descent（Slide 14–17）</h1>
+
+<h2 id="s5-1">5.1 数据增强（Dataset augmentation，Slide 14）</h2>
+
+<h3>① 直观理解</h3>
+<p>你教小孩认猫，只给他看了 5 张猫的正面照。他可能以为"猫 = 正面朝向的毛茸茸"。如果你把这 5 张照片翻转、旋转、放大缩小、调暗调亮，就变成了几十张"新"照片，小孩学到的是"不管什么角度、什么光线，这都是猫"。</p>
+<p>数据增强就是：<strong>数据不够，就用"不改变标签"的变换去造数据</strong>。它同时做了两件事：(1) 训练集变大 ⇒ 方差降低；(2) 把"这些变换不改变答案"的对称性教给了模型（<a href="#s1-3">1.3</a> 中处理对称性的第 3 种方法）。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>数据增强</strong>：通过对已有数据施加变换来生成额外的训练数据，例如<strong>平移、旋转</strong>、缩放、翻转、裁剪、颜色变化……；也可以<strong>加噪声（add noise）</strong>。</p>
+</div>
+
+<h3>③ 逻辑拆解：用的时候要注意什么</h3>
+<ol>
+<li><strong>变换必须保持标签不变</strong>：手写数字"6"旋转 180° 变成"9"，就不能用大角度旋转；字母"b"水平翻转变成"d"，就不能用水平翻转。</li>
+<li><strong>只在训练集上做</strong>：验证集/测试集不做随机增强，否则评估结果不可靠。</li>
+<li><strong>每个 epoch 随机生成</strong>：同一张图每次看到的版本都不一样，相当于数据量无限扩大。</li>
+</ol>
+
+<h3>④ 推导：输入加噪声 ⇔ L2 正则（线性模型）</h3>
+<p><strong>题目</strong>：线性模型 $y=\mathbf w^T\mathbf x$，训练时给输入加噪声 $\mathbf x\to\mathbf x+\boldsymbol\epsilon$，$\boldsymbol\epsilon$ 各分量独立，均值 0、方差 $\sigma^2$。证明期望平方误差 = 无噪声误差 + $\sigma^2\|\mathbf w\|^2$。</p>
+<ol>
+<li><strong>展开</strong>：$\big(\mathbf w^T(\mathbf x+\boldsymbol\epsilon)-t\big)^2=\big[(\mathbf w^T\mathbf x-t)+\mathbf w^T\boldsymbol\epsilon\big]^2=(\mathbf w^T\mathbf x-t)^2+2(\mathbf w^T\mathbf x-t)\,\mathbf w^T\boldsymbol\epsilon+(\mathbf w^T\boldsymbol\epsilon)^2$</li>
+<li><strong>对 $\boldsymbol\epsilon$ 取期望，中间项</strong>：$2(\mathbf w^T\mathbf x-t)\,\mathbf w^T\mathbb E[\boldsymbol\epsilon]=0$ → 因为噪声均值为 0。</li>
+<li><strong>最后一项</strong>：$\mathbb E[(\mathbf w^T\boldsymbol\epsilon)^2]=\mathbb E\big[\sum_i\sum_jw_iw_j\epsilon_i\epsilon_j\big]=\sum_{i,j}w_iw_j\mathbb E[\epsilon_i\epsilon_j]$。独立 ⇒ $i\ne j$ 时 $\mathbb E[\epsilon_i\epsilon_j]=0$；$i=j$ 时 $=\sigma^2$。所以 $=\sigma^2\sum_iw_i^2=\sigma^2\|\mathbf w\|^2$。</li>
+<li><strong>结论</strong>：$$\mathbb E_{\boldsymbol\epsilon}\big[(\mathbf w^T(\mathbf x+\boldsymbol\epsilon)-t)^2\big]=(\mathbf w^T\mathbf x-t)^2+\sigma^2\|\mathbf w\|^2$$ 正是 L2 正则，<strong>噪声方差 $\sigma^2$ 扮演了 λ 的角色</strong>。∎</li>
+</ol>
+
+<h3>⑤ 例题</h3>
+<p><strong>题目</strong>：$\mathbf w=(1,2)$，$\mathbf x=(1,1)$，$t=3$，输入噪声方差 $\sigma^2=0.1$。求加噪声后的期望平方误差。</p>
+<ol>
+<li>无噪声误差：$\mathbf w^T\mathbf x-t=1+2-3=0$，平方为 0</li>
+<li>正则项：$\sigma^2\|\mathbf w\|^2=0.1\times(1+4)=0.5$</li>
+<li>期望误差 $=0+0.5=0.5$</li>
+</ol>
+<p>即使在训练点上完美拟合，加噪声后仍有误差 0.5——它在惩罚大权重：权重越大，输入的小扰动造成的输出变化越大。</p>
+<pre><code>import torchvision.transforms as T
+train_tf = T.Compose([
+    T.RandomRotation(10),          # 随机旋转 ±10°
+    T.RandomHorizontalFlip(),      # 随机水平翻转
+    T.RandomResizedCrop(28, scale=(0.9, 1.0)),
+    T.ToTensor(),
+])
+test_tf = T.Compose([T.ToTensor()])   # 测试集不做随机增强
+
+# 加噪声增强
+x_noisy = x + sigma * torch.randn_like(x)</code></pre>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "增强越多越好，什么变换都可以加"</span> → <span class="right">✓ 变换必须保持标签不变（6/9、b/d 的例子）。</span></li>
+<li><span class="wrong">❌ "测试时也要做随机增强"</span> → <span class="right">✓ 增强只用于训练；测试用原始数据（TTA 是另一种技术，不在本课范围）。</span></li>
+</ul>
+
+<h2 id="s5-2">5.2 早停（Early stopping，Slide 15）— Q&amp;A 第 8 题</h2>
+
+<h3>① 直观理解</h3>
+<p>复习考试时，一开始越学越懂（训练误差、验证误差都降）。但如果一直刷同一本练习册，后来就变成了在背答案（训练误差还在降，但做新题的能力反而下降）。<strong>最聪明的做法是：在做新题成绩最好的那一刻停下来。</strong></p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p>训练过程中，横轴为 epoch 或 iteration：</p>
+<ul>
+<li><strong>训练集误差（training set error）</strong>：单调下降；</li>
+<li><strong>验证集误差（validation set error）</strong>：先下降、后上升（U 形）。</li>
+</ul>
+<p><strong>早停：在验证误差最小处停止训练</strong>（Stop at the minimum validation error），并使用那时的参数。</p>
+</div>
+
+<h3>③ 逻辑拆解：曲线的三个阶段</h3>
+<ol>
+<li><strong>前期</strong>：两条曲线都下降 → 模型在学真实规律（欠拟合 → 适度拟合）。</li>
+<li><strong>最低点</strong>：验证误差最小 → 泛化最好，<strong>停在这里</strong>。</li>
+<li><strong>后期</strong>：训练误差继续降、验证误差上升 → 开始记噪声（过拟合）。</li>
+</ol>
+<p><strong>为什么早停是正则化</strong>：训练从小权重（如 $\mathbf w=0$ 附近）出发，每一步权重都在"长大"、模型都在变复杂。提前停下，就是限制了权重能长到多大——效果和权重衰减一样（下一小节严格推导）。</p>
+
+<h3>代码（代码题常考写法）</h3>
+<pre><code>best_val, patience, bad = float('inf'), 10, 0
+for epoch in range(max_epochs):
+    model.train()
+    train_one_epoch(model)                    # 正常训练一个 epoch
+    model.eval()
+    with torch.no_grad():
+        val_loss = evaluate(model, val_loader)
+    if val_loss &lt; best_val:                   # 验证误差创新低
+        best_val, bad = val_loss, 0
+        torch.save(model.state_dict(), 'best.pt')   # 记住最好的参数
+    else:
+        bad += 1
+        if bad &gt;= patience:                   # 连续 patience 轮没改善就停
+            print('early stop at epoch', epoch)
+            break
+model.load_state_dict(torch.load('best.pt'))  # 恢复到验证误差最低的参数</code></pre>
+<p><strong>要点</strong>：(1) <code>patience</code>：验证误差有波动，不要一上升就停，等若干轮确认；(2) 一定要<strong>保存并恢复</strong>最优参数，而不是用停下时的参数。</p>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "在训练误差最小时停"</span> → <span class="right">✓ 看的是<strong>验证误差</strong>；训练误差会一直下降。</span></li>
+<li><span class="wrong">❌ "用测试集决定什么时候停"</span> → <span class="right">✓ 必须用独立的验证集；用测试集等于偷看考卷，测试结果会过于乐观。</span></li>
+</ul>
+
+<h2 id="s5-3">5.3 早停 ⇔ 权重衰减（Slide 16，推导题）</h2>
+
+<h3>① 直观理解</h3>
+<p>从 $\mathbf w=0$ 出发，梯度下降一步步走向最优点 $\mathbf w^*$。走了 τ 步就停下 ⇒ 停在 0 和 $\mathbf w^*$ 之间。而权重衰减的解 $\frac{H}{H+\lambda}\mathbf w^*$ 也在 0 和 $\mathbf w^*$ 之间！两者都是"没走到 $\mathbf w^*$"，只是方式不同。下面证明：<strong>走 τ 步 ≈ 用 $\lambda\approx\frac{1}{\epsilon\tau}$ 的权重衰减</strong>。</p>
+
+<h3>② 设定与结论</h3>
+<div class="block">
+<p>二次近似：$E(\mathbf w)=E(\mathbf w^*)+\frac12(\mathbf w-\mathbf w^*)^TH(\mathbf w-\mathbf w^*)$；从 $\mathbf w^{(0)}=0$ 出发，学习率 $\epsilon$，梯度下降 τ 步。对比权重衰减 $E(\mathbf w)+\frac12\lambda\|\mathbf w\|_2^2$。</p>
+<p><strong>结论</strong>：在第 τ 步早停，相当于加了系数为 $$\lambda\sim\frac{1}{\epsilon\tau}$$ 的权重衰减。（Goodfellow 等，p.242–245）</p>
+</div>
+
+<h3>④ 推导</h3>
+<ol>
+<li><strong>梯度</strong>：$\nabla E=H(\mathbf w-\mathbf w^*)$ → 二次函数的梯度。</li>
+<li><strong>一步更新</strong>：$\mathbf w^{(t)}=\mathbf w^{(t-1)}-\epsilon H(\mathbf w^{(t-1)}-\mathbf w^*)$</li>
+<li><strong>两边减 $\mathbf w^*$</strong>（看"离终点还有多远"）：$$\mathbf w^{(t)}-\mathbf w^*=(I-\epsilon H)(\mathbf w^{(t-1)}-\mathbf w^*)$$ → 每一步，到终点的距离都被乘以 $(I-\epsilon H)$。</li>
+<li><strong>迭代 τ 次</strong>，代入 $\mathbf w^{(0)}=0$：$\mathbf w^{(\tau)}-\mathbf w^*=(I-\epsilon H)^\tau(0-\mathbf w^*)$，即
+$$\mathbf w^{(\tau)}=\big[I-(I-\epsilon H)^\tau\big]\mathbf w^*$$</li>
+<li><strong>投影到 $H$ 的特征方向</strong>（特征值 $h_i$）：早停 $$w_i^{(\tau)}=\big[1-(1-\epsilon h_i)^\tau\big]w_i^*$$</li>
+<li><strong>权重衰减</strong>（见 <a href="#s3-3">3.3</a>）：$$w_i=\frac{h_i}{h_i+\lambda}w_i^*=\Big[1-\frac{\lambda}{h_i+\lambda}\Big]w_i^*$$</li>
+<li><strong>令两者相等</strong>：需要 $(1-\epsilon h_i)^\tau=\dfrac{\lambda}{h_i+\lambda}$。两边取对数：
+<ul>
+<li>左边：$\tau\ln(1-\epsilon h_i)\approx-\tau\epsilon h_i$（当 $\epsilon h_i\ll1$，用 $\ln(1-x)\approx-x$）</li>
+<li>右边：$\ln\frac{\lambda}{h_i+\lambda}=-\ln(1+h_i/\lambda)\approx-\frac{h_i}{\lambda}$（当 $h_i\ll\lambda$）</li>
+</ul></li>
+<li><strong>结论</strong>：$-\tau\epsilon h_i=-\frac{h_i}{\lambda}$ ⇒ $\tau\epsilon=\frac1\lambda$，即 $$\boxed{\lambda\sim\frac{1}{\epsilon\tau}}\quad\text{∎}$$</li>
+</ol>
+<p><strong>解读</strong>：</p>
+<ul>
+<li>训练步数 τ 越多（停得越晚）⇒ 等效 λ 越小 ⇒ 正则越弱；</li>
+<li>学习率 ε 越大 ⇒ 同样步数走得越远 ⇒ 等效 λ 越小；</li>
+<li>$\epsilon\tau$ 可以看作"有效模型复杂度"；</li>
+<li>优点：早停自动选好了"正则强度"，只需训练一次，不用对 λ 做多次实验。</li>
+</ul>
+
+<h3>⑤ 例题 1</h3>
+<p><strong>题目</strong>：$\epsilon=0.01$，$\tau=1000$。(1) 等效 λ 约为多少？(2) 一维情形 $h=0.01,\ w^*=1$，分别算早停和该 λ 下权重衰减的结果并比较。</p>
+<p><strong>解题思路</strong>：(1) 直接代公式；(2) 早停用 $1-(1-\epsilon h)^\tau$，权重衰减用 $\frac{h}{h+\lambda}$。</p>
+<ol>
+<li>$\lambda\approx\frac{1}{0.01\times1000}=0.1$</li>
+<li>早停：$1-(1-0.01\times0.01)^{1000}=1-0.9999^{1000}\approx1-e^{-0.1}\approx0.0952$</li>
+<li>权重衰减：$\frac{0.01}{0.01+0.1}\approx0.0909$</li>
+</ol>
+<p><strong>答案</strong>：0.0952 vs 0.0909，非常接近 ✔（两个近似条件 $\epsilon h=10^{-4}\ll1$、$h=0.01\ll\lambda=0.1$ 都成立）。</p>
+
+<h3>⑤ 例题 2</h3>
+<p><strong>题目</strong>：用学习率 $\epsilon=0.005$ 训练，想达到相当于 $\lambda=0.04$ 的权重衰减效果，大约应在第几步早停？</p>
+<p>$\tau\approx\frac{1}{\epsilon\lambda}=\frac{1}{0.005\times0.04}=5000$ 步。</p>
+<div class="tip">⚠ <strong>易错提醒</strong>：(1) 推导的前提是<strong>从 $\mathbf w=0$ 出发</strong>；(2) 结论是近似关系"∼"，只在 $\epsilon h_i\ll1$ 且 $h_i\ll\lambda$ 时成立；(3) 不要写成 $\lambda\sim\epsilon\tau$——步数越多正则越<strong>弱</strong>，是反比。</div>
+
+<h2 id="s5-4">5.4 Double descent（Slide 17）— Q&amp;A 第 7 题</h2>
+
+<h3>① 直观理解</h3>
+<p>经典的偏差-方差理论说：模型从简单到复杂，测试误差先降后升（U 形），所以模型"不能太大"。可是深度学习里人们发现，<strong>继续把模型变大，测试误差在冲到一个峰值后居然又降下来了</strong>，甚至比 U 形的最低点还低。误差曲线下降了两次——叫 double descent（双重下降）。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>Double descent</strong>：测试误差随模型复杂度（参数数量）变化时，呈现"下降 → 上升到峰值 → 再次下降"的形状。峰值出现在<strong>插值阈值（interpolation threshold）</strong>附近——即参数数量 ≈ 训练数据数量、模型<strong>刚好</strong>能把训练误差降到 0 的地方。</p>
+</div>
+
+<h3>③ 逻辑拆解：三个区域</h3>
+<table>
+<tr><th>区域</th><th>参数 vs 数据</th><th>测试误差</th><th>原因</th></tr>
+<tr><td>经典区（under-parameterized）</td><td>参数 &lt; 数据</td><td>先降后升（U 形）</td><td>符合偏差-方差权衡</td></tr>
+<tr><td>插值阈值（interpolation threshold）</td><td>参数 ≈ 数据</td><td><strong>峰值</strong></td><td>能拟合全部数据的解几乎<strong>唯一</strong>，模型被迫连噪声一起完美拟合，权重巨大、曲线剧烈震荡，方差爆炸</td></tr>
+<tr><td>过参数化区（over-parameterized）</td><td>参数 ≫ 数据</td><td><strong>再次下降</strong></td><td>能拟合全部数据的解有<strong>无穷多个</strong>；梯度下降（从小初始化出发）倾向于找到其中<strong>范数最小、最平滑</strong>的那个——相当于<strong>隐式正则化</strong></td></tr>
+</table>
+
+<h3>④ 联系前面的知识</h3>
+<ul>
+<li>"无穷多解中选最小范数解"——就是 <a href="#s2-1">2.1 例题 1</a> 中 $\lambda\to0$ 时得到的解 $(1,1)$！</li>
+<li>峰值处的"解唯一且对噪声极度敏感"——就是 ill-posed 问题的典型表现。</li>
+<li>加入适当的显式正则化（如 L2）能<strong>削弱甚至消除</strong>这个峰值。</li>
+<li>类似现象也可能随<strong>训练 epoch 数</strong>出现（epoch-wise double descent），这与早停的经典图景不同。</li>
+</ul>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "Double descent 说明偏差-方差理论是错的"</span> → <span class="right">✓ 经典理论在欠参数化区仍然成立；double descent 补充了过参数化区的行为。</span></li>
+<li><span class="wrong">❌ "模型越大一定越好"</span> → <span class="right">✓ 在插值阈值附近反而最差；而且大模型能变好依赖于优化算法的隐式正则化。</span></li>
+</ul>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 把学习率翻倍、训练步数不变，早停对应的等效正则变强还是变弱？</p>
+<details><summary>点击查看答案</summary><p>$\lambda\sim1/(\epsilon\tau)$，$\epsilon$ 翻倍 ⇒ λ 减半 ⇒ 正则<strong>变弱</strong>（走得更远，更接近 $\mathbf w^*$）。</p></details>
+<p><strong>Q2.</strong> 有 100 个训练样本，用线性模型拟合，参数从 10 增加到 1000。测试误差的峰值大约出现在多少个参数时？</p>
+<details><summary>点击查看答案</summary><p>约 100 个参数——参数数 ≈ 数据数的插值阈值处。</p></details>
+<p><strong>Q3.</strong> 手写数字识别中，为什么不应该对训练图片做 180° 旋转增强？</p>
+<details><summary>点击查看答案</summary><p>"6" 旋转 180° 变成 "9"，标签改变了；数据增强的变换必须保持标签不变。</p></details>
+</div>
+
+<!-- ====================== 第 6 节 ====================== -->
+<h1 id="s6">第 6 节　Bagging、模型平均、Dropout（Slide 18–19）</h1>
+
+<h2 id="s6-1">6.1 Bagging 与模型平均（Slide 18）— Q&amp;A 第 9 题</h2>
+
+<h3>① 直观理解</h3>
+<p>猜一个罐子里有多少颗糖：一个人猜，可能偏差很大；问 100 个人，把答案取平均，往往惊人地准——因为有人猜多、有人猜少，<strong>误差互相抵消</strong>。</p>
+<p>但有个前提：大家要<strong>独立</strong>地猜。如果 100 个人都抄同一个人的答案，平均还是那一个答案，毫无改进。<strong>模型之间越"不一样"，平均的效果越好。</strong></p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>模型平均（model averaging）</strong>：使用多个不同模型的平均：</p>
+$$y_{COM}(x)=\frac1M\sum_{m=1}^M y_m(x)$$
+<p><strong>Bagging（bootstrap aggregating）</strong>：获得"不同模型"的一种方法——从训练集中<strong>有放回地</strong>抽样，得到 $M$ 个 bootstrap 数据集，各训练一个模型，再平均。</p>
+<p>若各模型误差<strong>不相关</strong>，方差减小为原来的 $1/M$。</p>
+</div>
+
+<h3>③ 逻辑拆解：Bagging 的步骤</h3>
+<ol>
+<li><strong>Bootstrap 抽样</strong>：从 $N$ 个样本中有放回地抽 $N$ 次，得到一个新数据集（有的样本重复，有的没被抽到；平均约 63.2% 的不同样本被抽中）。重复 $M$ 次。</li>
+<li><strong>分别训练</strong>：每个数据集训练一个模型 $y_m$。因为数据不同，模型的误差也不同。</li>
+<li><strong>聚合</strong>：回归取平均；分类可以投票。</li>
+</ol>
+
+<h3>④ 推导（计算题重点）</h3>
+<p>设第 $m$ 个模型的误差为 $\epsilon_m$，并假设：</p>
+<ul>
+<li>$\mathbb E[\epsilon_m^2]=v$（每个模型的误差方差相同）</li>
+<li>$\mathbb E[\epsilon_m\epsilon_k]=c$，$k\ne m$（任意两个模型误差的协方差相同）</li>
+</ul>
+<p>平均模型的误差是 $\frac1M\sum_m\epsilon_m$，其期望平方误差：</p>
+<ol>
+<li><strong>提出常数</strong>：$\mathbb E\Big[\Big(\frac1M\sum_{m=1}^M\epsilon_m\Big)^2\Big]=\frac1{M^2}\mathbb E\Big[\Big(\sum_{m=1}^M\epsilon_m\Big)^2\Big]$</li>
+<li><strong>平方展开</strong>：$\big(\sum_m\epsilon_m\big)^2=\sum_m\epsilon_m^2+\sum_{k\ne m}\epsilon_m\epsilon_k$ → $M$ 个平方项 + $M(M-1)$ 个交叉项（有序对）</li>
+<li><strong>逐项取期望</strong>：$=\frac1{M^2}\big[M\cdot v+M(M-1)\cdot c\big]$</li>
+<li><strong>化简</strong>：$$\boxed{\frac1Mv+\frac{M-1}{M}c}$$</li>
+</ol>
+<p><strong>三种情况讨论（概念题常问）</strong>：</p>
+<table>
+<tr><th>情况</th><th>结果</th><th>含义</th></tr>
+<tr><td>$c=0$（完全不相关）</td><td>$v/M$</td><td>最好情况，方差降为 $1/M$</td></tr>
+<tr><td>$c=v$（完全相关）</td><td>$v$</td><td>所有模型一模一样，平均毫无用处</td></tr>
+<tr><td>$M\to\infty$</td><td>$\to c$</td><td>相关性 $c$ 是下限，模型再多也降不到 $c$ 以下</td></tr>
+</table>
+
+<h3>⑤ 例题 1</h3>
+<p><strong>题目</strong>：$M=5$ 个模型，每个误差方差 $v=4$，两两协方差 $c=1$。求平均模型的期望平方误差；若 $M\to\infty$ 呢？与单个模型相比改进了多少？</p>
+<p><strong>解题思路</strong>：直接代公式，再取极限。</p>
+<ol>
+<li>$\frac15\times4+\frac45\times1=0.8+0.8=1.6$</li>
+<li>$M\to\infty$：$\to c=1$</li>
+<li>单模型误差 4 → 5 个模型平均 1.6，下降 60%；再多模型也只能降到 1。</li>
+</ol>
+
+<h3>⑤ 例题 2</h3>
+<p><strong>题目</strong>：每个模型误差方差 $v=9$，要求平均模型误差 ≤ 4。(a) 若 $c=0$，至少需要多少个模型？(b) 若 $c=3$ 呢？(c) 若 $c=5$ 呢？</p>
+<ol>
+<li>(a) $9/M\le4\Rightarrow M\ge2.25$，取 $M=3$</li>
+<li>(b) $\frac9M+\frac{M-1}M\cdot3=3+\frac6M\le4\Rightarrow M\ge6$</li>
+<li>(c) $\frac9M+\frac{M-1}{M}\cdot5=5+\frac4M>5>4$ —— <strong>无论多少个模型都做不到</strong>（下限是 $c=5$）</li>
+</ol>
+<div class="tip">⚠ <strong>易错提醒</strong>：(1) 交叉项个数是 $M(M-1)$ 而不是 $\binom M2$——$\epsilon_m\epsilon_k$ 和 $\epsilon_k\epsilon_m$ 各算一次；如果用 $\binom M2$，前面要乘 2。(2) 化简时 $\frac{M(M-1)c}{M^2}=\frac{M-1}{M}c$，不要约错。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "Bagging 主要降低偏差"</span> → <span class="right">✓ Bagging 主要降低<strong>方差</strong>；平均后的偏差与单个模型差不多。</span></li>
+<li><span class="wrong">❌ "模型越多，误差就能无限降低"</span> → <span class="right">✓ 下限是相关性 $c$；关键是让模型之间<strong>多样化</strong>。</span></li>
+</ul>
+
+<h2 id="s6-2">6.2 Dropout（Slide 19）— Q&amp;A 第 10 题</h2>
+
+<h3>① 直观理解</h3>
+<p>一个团队，如果每次开会都随机有一半人请假，那每个人都必须学会独当一面，不能总依赖某个"大神"同事。神经网络也一样：如果每次训练随机关掉一部分神经元，每个神经元都必须学到<strong>自己就有用</strong>的特征，而不是和特定的几个神经元"抱团"（这种抱团叫<strong>共适应 co-adaptation</strong>，是过拟合的来源之一）。</p>
+<p>另一个角度：每次关掉不同的神经元，就相当于在训练一个<strong>不同的小网络</strong>。训练完后，用完整网络做预测，就近似于把这些小网络的预测取了平均——这是一种"<strong>廉价版的 bagging</strong>"。</p>
+
+<h3>② 核心定义</h3>
+<div class="block">
+<p><strong>Dropout</strong>：在每次训练迭代中，节点及其连接被<strong>随机删除</strong>（每个节点以概率 $p$ 被丢弃）。它是一种<strong>隐式地对指数多个模型做近似模型平均</strong>的方法（an implicit way to perform approximate model average over exponentially many models）。</p>
+</div>
+
+<h3>③ 逻辑拆解</h3>
+<ol>
+<li><strong>为什么是"指数多个"模型</strong>：$N$ 个可被丢弃的节点，每个"在/不在"两种状态 ⇒ 共 $2^N$ 个子网络。</li>
+<li><strong>和 bagging 的异同</strong>：
+<table>
+<tr><th></th><th>Bagging</th><th>Dropout</th></tr>
+<tr><td>模型数</td><td>$M$ 个（通常几个到几十个）</td><td>$2^N$ 个子网络（指数多）</td></tr>
+<tr><td>参数</td><td>各模型独立</td><td><strong>共享权重</strong></td></tr>
+<tr><td>训练</td><td>每个模型训练到收敛</td><td>每次迭代只训练一个随机子网络的一步</td></tr>
+<tr><td>预测</td><td>显式平均 $M$ 个输出</td><td>用完整网络（缩放后）<strong>近似</strong>平均</td></tr>
+<tr><td>成本</td><td>$M$ 倍</td><td>几乎不增加</td></tr>
+</table></li>
+<li><strong>训练 vs 测试</strong>：训练时随机丢弃；测试时<strong>不丢弃</strong>，使用完整网络。</li>
+</ol>
+
+<h3>④ 推导：为什么需要缩放（inverted dropout）</h3>
+<p>设某节点激活值为 $a$，掩码 $m\sim\text{Bernoulli}(1-p)$（以概率 $1-p$ 保留取 1，以概率 $p$ 丢弃取 0）。</p>
+<ol>
+<li><strong>不缩放</strong>：训练输出 $h=m\,a$，$\mathbb E[h]=(1-p)a$；测试输出 $a$。训练和测试的<strong>尺度不一致</strong>。</li>
+<li><strong>Inverted dropout</strong>（PyTorch 的做法）：训练时 $h=\dfrac{m\,a}{1-p}$，则 $$\mathbb E[h]=\frac{(1-p)a}{1-p}=a$$ 与测试时一致，测试时什么都不用改。</li>
+</ol>
+
+<h3>⑤ 例题 1：期望值缩放</h3>
+<p><strong>题目</strong>：某神经元输出 $a=2$，dropout 概率 $p=0.5$。(1) 不缩放时训练输出的期望？(2) inverted dropout 下训练输出可能的取值和期望？</p>
+<ol>
+<li>(1) $0.5\times0+0.5\times2=1$，而测试时为 2 ⇒ 不一致</li>
+<li>(2) 保留时 $2/(1-0.5)=4$，丢弃时 0；期望 $0.5\times4+0.5\times0=2$ ✔</li>
+</ol>
+
+<h3>⑤ 例题 2：一次前向传播</h3>
+<p><strong>题目</strong>：某层激活 $\mathbf a=(2,1,3,4)$，$p=0.5$，本次随机掩码 $\mathbf m=(1,0,1,0)$。求 inverted dropout 后的输出；这一层有多少个可能的子网络？</p>
+<ol>
+<li>$\mathbf h=\mathbf m\odot\mathbf a/(1-p)=(1\cdot2,\ 0,\ 1\cdot3,\ 0)/0.5=(4,\ 0,\ 6,\ 0)$</li>
+<li>子网络数：$2^4=16$</li>
+</ol>
+<pre><code>import torch.nn as nn
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(784, 256)
+        self.drop = nn.Dropout(p=0.5)     # p = 丢弃概率
+        self.fc2 = nn.Linear(256, 10)
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = self.drop(x)                  # 只在 model.train() 模式下生效
+        return self.fc2(x)
+
+model.train()   # 训练：dropout 打开（并自动乘 1/(1-p)）
+model.eval()    # 测试：dropout 关闭（忘写这行是经典 bug）</code></pre>
+<div class="tip">⚠ <strong>易错提醒</strong>：(1) PyTorch 中 <code>p</code> 是<strong>丢弃</strong>概率；有些论文/教材里 $p$ 指<strong>保留</strong>概率，读题看清楚。(2) 评估前忘记 <code>model.eval()</code>，测试结果会带随机性且偏差。</div>
+
+<h3>⑥ 常见误区</h3>
+<ul>
+<li><span class="wrong">❌ "测试时也要随机丢弃"</span> → <span class="right">✓ 测试用完整网络；（MC dropout 用于估计不确定性是另一回事。）</span></li>
+<li><span class="wrong">❌ "Dropout 删掉的神经元以后就不存在了"</span> → <span class="right">✓ 每次迭代重新随机抽，删除只是临时的。</span></li>
+<li><span class="wrong">❌ "Dropout 就是训练了 $2^N$ 个独立网络"</span> → <span class="right">✓ 这些子网络<strong>共享权重</strong>，且大多数从未被单独训练过，只是"近似"平均。</span></li>
+</ul>
+
+<div class="check">
+<p><strong>🤔 停下来想想</strong></p>
+<p><strong>Q1.</strong> 一个隐藏层有 10 个可被 dropout 的神经元，dropout 隐式平均了多少个子网络？</p>
+<details><summary>点击查看答案</summary><p>$2^{10}=1024$ 个。</p></details>
+<p><strong>Q2.</strong> 为什么 bagging 公式中 $c$ 越小越好？dropout 用什么方式让"子模型"彼此不同？</p>
+<details><summary>点击查看答案</summary><p>误差 $=\frac vM+\frac{M-1}Mc$，$c$ 是下限，越小平均越有效。Dropout 每次随机删除不同的节点，使每次训练的子网络结构不同。</p></details>
+</div>
+
+<!-- ====================== 总结 ====================== -->
+<h1 id="s7">全章总结 + 10 道概念题答案模板（Slide 20–21）</h1>
+<div class="block">
+<p><strong>Summary（Slide 21）</strong></p>
+<ul>
+<li>Inductive bias —— 帮助泛化的假设</li>
+<li>Regularization —— 控制模型复杂度，克服过拟合</li>
+<li>L2 / weight decay —— 收缩权重</li>
+<li>L1 —— 促进稀疏</li>
+<li>Early stopping / dropout / bagging —— 都能减少过拟合</li>
+<li><strong>核心思想：好的泛化需要在"拟合数据"与"控制模型复杂度"之间取得正确的平衡。</strong></li>
+</ul>
+</div>
+
+<h3>概念关系图</h3>
+<pre style="background:#f8fafc;color:#1e293b;border:1px solid #e2e8f0">No free lunch ──需要──→ 归纳偏置 ──具体形式──→ 对称性(群) / 光滑性
+                                │
+                                └──显式化──→ 正则化 ──权衡──→ 偏差-方差
+                                               │
+          ┌──────────────┬────────────┬────────┴─────┬──────────────┐
+       L2/权重衰减        L1/LASSO      数据增强         早停         Bagging/Dropout
+    (高斯先验, 收缩)  (拉普拉斯, 稀疏)  (加噪声≈L2)   (λ~1/ετ ≈L2)   (降方差 v/M)</pre>
+
+<h3>Slide 20 的 10 个问题 —— 考场答案模板</h3>
+<table>
+<tr><th>#</th><th>问题</th><th>答题要点</th></tr>
+<tr><td>1</td><td>Inductive bias</td><td>学习算法为在未见数据上泛化而对目标函数作的假设（光滑性、对称性等）；因 NFL 定理，没有归纳偏置就无法在特定问题上优于其他算法；例：CNN 的平移等变、L2 偏好小权重。</td></tr>
+<tr><td>2</td><td>Invariance vs equivariance</td><td>不变：$f(TI)=f(I)$，输出不随变换改变（分类）；等变：$S(TI)=T(S(I))$，输出随输入以相同方式变换（分割）；卷积层平移等变，加池化后近似不变。</td></tr>
+<tr><td>3</td><td>Regularization</td><td>提高泛化、减少过拟合的方法；把 ill-posed 问题变 well-posed；典型形式 $\tilde E=E+\frac\lambda2\mathbf w^T\mathbf w$；例：权重衰减、L1、早停、dropout、数据增强。</td></tr>
+<tr><td>4</td><td>Bias-variance trade-off</td><td>期望测试误差 = bias² + variance（+噪声）；λ 大：高偏差低方差（欠拟合）；λ 小：低偏差高方差（过拟合）；选 λ 使总误差最小。写出分解公式。</td></tr>
+<tr><td>5</td><td>Weight decay</td><td>$\tilde E=E+\frac\lambda2\|\mathbf w\|^2$；梯度下降中 $\mathbf w\leftarrow(1-\eta\lambda)\mathbf w-\eta\nabla E$，每步按比例衰减；等价于高斯先验下的 MAP；一维解 $\frac{H}{H+\lambda}w^*$。</td></tr>
+<tr><td>6</td><td>L2 vs L1</td><td>相同：都惩罚复杂度、可写成约束形式、凸。不同：L2 按比例收缩不归零（圆、高斯先验）；L1 软阈值产生稀疏（菱形、拉普拉斯先验），可做特征选择。写出两个一维解。</td></tr>
+<tr><td>7</td><td>Double descent</td><td>测试误差随模型复杂度：经典 U 形 → 在插值阈值（参数≈数据）处达峰 → 过参数化后再次下降；原因是过参数化时优化隐式选出小范数解。</td></tr>
+<tr><td>8</td><td>Early stopping</td><td>监控验证误差，在其最小处停止训练并恢复最优参数；二次近似下等价于权重衰减 $\lambda\sim1/(\epsilon\tau)$；训练越久等效正则越弱。</td></tr>
+<tr><td>9</td><td>Bagging</td><td>有放回抽样训练 $M$ 个模型并平均；误差 $=\frac1Mv+\frac{M-1}Mc$，不相关时方差降为 $1/M$；主要降低方差。</td></tr>
+<tr><td>10</td><td>Dropout</td><td>每次迭代随机删除节点及连接；隐式地对 $2^N$ 个共享权重的子网络做近似模型平均；防止共适应；测试时用完整网络（inverted dropout 训练时乘 $1/(1-p)$）。</td></tr>
+</table>
+
+<!-- ====================== 综合练习 ====================== -->
+<h1 id="s8">综合练习（作业难度计算题）</h1>
+<p>先自己做，再点开答案。每题都写了"看到题目该怎么想"。</p>
+
+<div class="check">
+<p><strong>练习 1（L1 vs L2 一维）</strong>　$E(w)=\frac12\cdot3\,(w-w^*)^2$。(a) 用 L2 正则 $\frac12\cdot6\,w^2$，$w^*=4.5$，求最优 $w$；(b) 用 L1 正则 $3|w|$，分别对 $w^*=4.5$ 和 $w^*=0.8$ 求最优 $w$。</p>
+<details><summary>点击查看答案</summary>
+<p><strong>思路</strong>：读出 $H$ 和 λ，L2 套 $\frac{H}{H+\lambda}w^*$，L1 先算阈值 $\lambda/H$。</p>
+<p>(a) $H=3,\lambda=6$：$w=\frac{3}{9}\times4.5=1.5$。</p>
+<p>(b) $H=3,\lambda=3$，阈值 $=1$：$w^*=4.5>1\Rightarrow w=3.5$；$w^*=0.8\le1\Rightarrow w=0$。</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 2（偏差-方差）</strong>　在 $x_0$ 处真值 $h=1$，4 个训练集得到的预测为 $0.5,\ 1.5,\ 2,\ 2$。求 bias²、variance、期望误差并验证。</p>
+<details><summary>点击查看答案</summary>
+<p><strong>思路</strong>：先求均值，再分别算。</p>
+<p>$\bar f=1.5$；bias² $=(1.5-1)^2=0.25$；variance $=\frac14(1+0+0.25+0.25)=0.375$；期望误差 $=\frac14(0.25+0.25+1+1)=0.625=0.25+0.375$ ✔</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 3（MAP）</strong>　若先验为 $p(\mathbf w)\propto\exp(-\alpha\|\mathbf w\|_1)$，似然由方差为 $\sigma^2$ 的高斯噪声给出，写出 MAP 等价的优化问题，并说明它对应哪种正则。</p>
+<details><summary>点击查看答案</summary>
+<p><strong>思路</strong>：取 $-\log$ 后验 = $-\log$ 似然 $-\log$ 先验。</p>
+<p>$\min_{\mathbf w}\ \frac{1}{2\sigma^2}\sum_n(y(x_n,\mathbf w)-t_n)^2+\alpha\|\mathbf w\|_1$ —— L1 正则（LASSO），对应拉普拉斯先验。</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 4（二维 L2）</strong>　$E=\frac12(\mathbf w-\mathbf w^*)^TH(\mathbf w-\mathbf w^*)$，$H=\mathrm{diag}(3,1)$，$\mathbf w^*=(2,2)$，加正则 $\frac12\cdot1\cdot\|\mathbf w\|^2$。求最优 $\mathbf w$，并指出哪个方向被压缩得更多。</p>
+<details><summary>点击查看答案</summary>
+<p><strong>思路</strong>：$H$ 对角，逐分量套 $\frac{h_i}{h_i+\lambda}w_i^*$。</p>
+<p>$w_1=\frac34\times2=1.5$，$w_2=\frac12\times2=1$。曲率小的第 2 个方向被压缩得更多。</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 5（Bagging）</strong>　10 个模型，每个误差方差 $v=5$，平均后的期望平方误差测得为 1.4。求模型误差之间的协方差 $c$。</p>
+<details><summary>点击查看答案</summary>
+<p><strong>思路</strong>：代入公式反解 $c$。</p>
+<p>$\frac{5}{10}+\frac{9}{10}c=1.4\Rightarrow c=1$。</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 6（早停）</strong>　学习率 $\epsilon=0.02$，在第 $\tau=250$ 步早停。(a) 等效 λ？(b) 若想让等效 λ 变为原来的一半，应在第几步停？</p>
+<details><summary>点击查看答案</summary>
+<p>(a) $\lambda\approx\frac{1}{0.02\times250}=0.2$。(b) λ 减半 ⇒ $\epsilon\tau$ 加倍 ⇒ $\tau=500$。</p>
+</details>
+</div>
+
+<div class="check">
+<p><strong>练习 7（加噪声 ⇔ L2）</strong>　线性模型 $y=\mathbf w^T\mathbf x$，训练时输入加独立零均值噪声，方差 $\sigma^2=0.05$。这等价于加了什么形式、什么系数的正则项？若写成 $\frac\lambda2\|\mathbf w\|^2$，λ 是多少？</p>
+<details><summary>点击查看答案</summary>
+<p>等价于 $\sigma^2\|\mathbf w\|^2=0.05\|\mathbf w\|^2$；写成 $\frac\lambda2\|\mathbf w\|^2$ 时 $\lambda=0.1$。</p>
+</details>
+</div>
+
+<p style="color:#6b7280;margin-top:40px;text-align:center">— Week 6 正则化 全章完 · <a href="#toc">回到目录</a> —</p>
+
+</body>
+</html>
